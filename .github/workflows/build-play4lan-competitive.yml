@@ -35,6 +35,7 @@ jobs:
           python PLAY4LANCompetitive/build_ready_v102.py
           python PLAY4LANCompetitive/build_ready_v103.py
           python PLAY4LANCompetitive/build_telemetry_v104.py
+          python PLAY4LANCompetitive/build_test_v105.py
 
       - name: Compilar PLAY4LAN Competitive
         run: |
@@ -46,7 +47,7 @@ jobs:
           mkdir -p artifact/cfg
           cp -r upstream/cfg/PLAY4LAN artifact/cfg/PLAY4LAN
           cat > artifact/INSTALAR_PLAY4LAN.txt <<'EOF'
-          PLAY4LAN COMPETITIVE 1.0.4
+          PLAY4LAN COMPETITIVE 1.0.5 - MODO TESTE
 
           1. PARE O SERVER 01.
           2. SUBSTITUA A PASTA:
@@ -57,26 +58,29 @@ jobs:
           5. NO CONSOLE DIGITE:
              css_plugins list
 
-          Deve aparecer: PLAY4LAN Competitive 1.0.4 by PLAY4LAN
+          Deve aparecer: PLAY4LAN Competitive 1.0.5 by PLAY4LAN
 
-          NOVO NA 1.0.4:
-          - css_play4lan_players retorna jogadores conectados em JSON
-          - SteamID64, nickname, lado e pronto vem direto do plugin
-          - o painel nao depende do login Steam do site para detectar jogadores
+          MODO TESTE DESTA BUILD:
+          - .espera substitui .naopronto
+          - 1 jogador usando .pronto inicia a partida automaticamente
+          - play4lan_test_mode 1 liga teste solo
+          - play4lan_test_mode 0 restaura a regra oficial 5/5 x 5/5
+          - ao voltar para producao, use play4lan_test_mode 0
           EOF
 
       - name: Verificar pacote
         run: |
           test -f artifact/addons/counterstrikesharp/plugins/PLAY4LANCompetitive/PLAY4LANCompetitive.dll
-          grep -R 'ModuleVersion => "1.0.4"' upstream/MatchZy.cs
+          grep -R 'ModuleVersion => "1.0.5"' upstream/MatchZy.cs
+          grep -R 'ConsoleCommand("css_espera"' upstream/ConsoleCommands.cs
+          grep -R "play4lanTestMode = true" upstream/MatchZy.cs
+          grep -R "play4lan_test_mode" upstream/Play4LanTestMode.cs
           grep -R "css_play4lan_players" upstream/Play4LanTelemetry.cs
-          grep -R "PLAY4LAN_PLAYERS_JSON" upstream/Play4LanTelemetry.cs
-          grep -R "play4lanReadyLockedTeam" upstream/MatchZy.cs
 
       - name: Enviar pacote compilado
         uses: actions/upload-artifact@v4
         with:
-          name: PLAY4LANCompetitive-v1.0.4-SERVER01
+          name: PLAY4LANCompetitive-v1.0.5-TESTE-SOLO-SERVER01
           path: artifact
           if-no-files-found: error
           retention-days: 30
