@@ -1,0 +1,1 @@
+{% extends 'base.html' %}{% block content %}<div class="title-row"><h1>Times</h1>{% if current_user.is_authenticated %}<a class="button" href="/teams/create">Criar time</a>{% endif %}</div><div class="grid">{% for t in teams %}<a class="card" href="/teams/{{t.id}}"><h3>{{t.name}}</h3><p>{{t.tag}} · {{t.members|length}} jogadores</p></a>{% endfor %}</div>{% endblock %}

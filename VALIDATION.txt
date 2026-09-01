@@ -1,0 +1,5 @@
+VALIDAÇÃO DO PACOTE
+- Python compileall: OK
+- Estrutura web/agent: OK
+- Teste runtime Flask: não executado neste ambiente porque o container está sem acesso DNS/internet para instalar as dependências Python.
+- Rode scripts/setup_windows.bat no PC com internet; depois scripts/run_web_windows.bat.

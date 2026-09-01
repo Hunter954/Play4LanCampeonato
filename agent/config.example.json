@@ -1,0 +1,11 @@
+{
+  "platform_url": "https://SEU-PROJETO.up.railway.app",
+  "token": "MESMO_AGENT_SHARED_TOKEN_DO_RAILWAY",
+  "host_id": "FOZ-LAN-01",
+  "heartbeat_seconds": 10,
+  "command_poll_seconds": 2,
+  "servers": [
+    {"code":"SERVER01","display_name":"Server 01","exe":"C:/cs2/server01/game/bin/win64/cs2.exe","args":["-dedicated","-port","27015","+map","de_mirage"],"cwd":"C:/cs2/server01/game/bin/win64","demo_dir":"C:/cs2/server01/game/csgo"},
+    {"code":"SERVER02","display_name":"Server 02","exe":"C:/cs2/server02/game/bin/win64/cs2.exe","args":["-dedicated","-port","27016","+map","de_mirage"],"cwd":"C:/cs2/server02/game/bin/win64","demo_dir":"C:/cs2/server02/game/csgo"}
+  ]
+}
