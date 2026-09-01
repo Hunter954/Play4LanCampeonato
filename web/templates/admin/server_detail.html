@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block title %}{{ server.display_name or server.code }} · Admin{% endblock %}
+{% block content %}
+<div class="title-row">
+  <div>
+    <span class="eyebrow">{{ server.host_id or 'HOST NÃO VINCULADO' }}</span>
+    <h1>{{ server.display_name or server.code }}</h1>
+  </div>
+  <span class="server-big-status {{ server.status|lower }}">● {{ server.status }}</span>
+</div>
+
+<div class="server-meta-grid">
+  <div class="stat-card"><span>Mapa</span><b>{{ telemetry.get('map','—') }}</b></div>
+  <div class="stat-card"><span>Players</span><b>{{ telemetry.get('player_count',0) }}</b></div>
+  <div class="stat-card"><span>RCON</span><b>{{ 'OK' if telemetry.get('rcon_ok') else ('ERRO' if telemetry.get('online') else '—') }}</b></div>
+  <div class="stat-card"><span>Heartbeat</span><b>{{ server.last_heartbeat or '—' }}</b></div>
+</div>
+{% if telemetry.get('rcon_error') %}<div class="flash danger"><b>RCON:</b> {{ telemetry.get('rcon_error') }}</div>{% endif %}
+
+<div class="server-layout">
+  <section>
+    <div class="panel">
+      <div class="title-row"><h2>Jogadores conectados</h2><form method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='STATUS') }}"><button class="secondary">Atualizar status</button></form></div>
+      <div class="player-table">
+        <div class="player-row player-head"><span>UserID</span><span>Nickname</span><span>Steam</span><span>Ping</span><span></span></div>
+        {% for p in telemetry.get('players',[]) %}
+        <div class="player-row">
+          <span>#{{ p.get('userid','?') }}</span>
+          <strong>{{ p.get('name','?') }}</strong>
+          <code>{{ p.get('steam','?') }}</code>
+          <span>{{ p.get('ping','?') }} ms</span>
+          <form method="post" action="{{ url_for('admin.server_kick',code=server.code) }}"><input type="hidden" name="userid" value="{{ p.get('userid') }}"><button class="danger small">Kick</button></form>
+        </div>
+        {% else %}
+        <div class="empty-state">Nenhum jogador foi identificado pelo último <code>status</code>. Se houver jogadores conectados, clique em Atualizar status.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel command-panel">
+      <h2>Console RCON</h2>
+      <form method="post" action="{{ url_for('admin.server_rcon',code=server.code) }}" class="command-form">
+        <input name="command" autocomplete="off" placeholder="status, sv_cheats, mp_restartgame 1..." required>
+        <button>Enviar</button>
+      </form>
+      <p class="muted">Console bruto disponível apenas para administrador. As ações competitivas depois serão transformadas em botões/regras próprias da plataforma.</p>
+    </div>
+
+    <div class="panel">
+      <h2>Últimos comandos</h2>
+      <div class="command-history">
+        {% for c in commands %}
+        <div class="command-item">
+          <div><b>#{{ c.id }} · {{ c.command }}</b> <span class="cmd-status {{ c.status|lower }}">{{ c.status }}</span></div>
+          {% if c.payload.get('command') %}<code>&gt; {{ c.payload.get('command') }}</code>{% endif %}
+          {% if c.payload.get('_result') %}<pre>{{ c.payload.get('_result') }}</pre>{% endif %}
+          {% if c.payload.get('_error') %}<div class="command-error">{{ c.payload.get('_error') }}</div>{% endif %}
+        </div>
+        {% else %}<p class="muted">Nenhum comando enviado.</p>{% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <aside>
+    <div class="panel sticky-panel">
+      <h2>Controle do servidor</h2>
+      <div class="stack-actions">
+        <form method="post" action="/admin/servers/{{server.code}}/START"><button>Iniciar servidor</button></form>
+        <form method="post" action="/admin/servers/{{server.code}}/RESTART"><button class="secondary">Reiniciar processo</button></form>
+        <form method="post" action="/admin/servers/{{server.code}}/STOP"><button class="danger">Parar servidor</button></form>
+      </div>
+
+      <h3>Partida / teste</h3>
+      <div class="stack-actions">
+        <form method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='WARMUP_END') }}"><button>Encerrar warmup</button></form>
+        <form method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='RESTART_ROUND') }}"><button class="secondary">Reiniciar jogo (1s)</button></form>
+        <form method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='PAUSE') }}"><button class="secondary">Pausar</button></form>
+        <form method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='UNPAUSE') }}"><button class="secondary">Retomar</button></form>
+      </div>
+
+      <h3>Trocar mapa</h3>
+      <form method="post" action="{{ url_for('admin.server_change_map',code=server.code) }}">
+        <select name="map_name">
+          <option>de_mirage</option><option>de_inferno</option><option>de_nuke</option><option>de_ancient</option><option>de_anubis</option><option>de_dust2</option><option>de_train</option>
+        </select>
+        <button class="secondary">Carregar mapa</button>
+      </form>
+    </div>
+  </aside>
+</div>
+{% endblock %}

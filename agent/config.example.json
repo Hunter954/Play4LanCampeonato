@@ -5,7 +5,55 @@
   "heartbeat_seconds": 10,
   "command_poll_seconds": 2,
   "servers": [
-    {"code":"SERVER01","display_name":"Server 01","exe":"C:/cs2/server01/game/bin/win64/cs2.exe","args":["-dedicated","-port","27015","+map","de_mirage"],"cwd":"C:/cs2/server01/game/bin/win64","demo_dir":"C:/cs2/server01/game/csgo"},
-    {"code":"SERVER02","display_name":"Server 02","exe":"C:/cs2/server02/game/bin/win64/cs2.exe","args":["-dedicated","-port","27016","+map","de_mirage"],"cwd":"C:/cs2/server02/game/bin/win64","demo_dir":"C:/cs2/server02/game/csgo"}
+    {
+      "code": "SERVER01",
+      "display_name": "Server 01",
+      "exe": "C:/CS2Platform/runtime/server01/game/bin/win64/cs2.exe",
+      "args": [
+        "-dedicated",
+        "-console",
+        "-usercon",
+        "-port",
+        "27015",
+        "+game_type",
+        "0",
+        "+game_mode",
+        "1",
+        "+rcon_password",
+        "TROQUE_A_SENHA_RCON_SERVER01",
+        "+map",
+        "de_mirage"
+      ],
+      "cwd": "C:/CS2Platform/runtime/server01/game/bin/win64",
+      "demo_dir": "C:/CS2Platform/runtime/server01/game/csgo",
+      "rcon_host": "127.0.0.1",
+      "rcon_port": 27015,
+      "rcon_password": "TROQUE_A_SENHA_RCON_SERVER01"
+    },
+    {
+      "code": "SERVER02",
+      "display_name": "Server 02",
+      "exe": "C:/CS2Platform/runtime/server02/game/bin/win64/cs2.exe",
+      "args": [
+        "-dedicated",
+        "-console",
+        "-usercon",
+        "-port",
+        "27016",
+        "+game_type",
+        "0",
+        "+game_mode",
+        "1",
+        "+rcon_password",
+        "TROQUE_A_SENHA_RCON_SERVER02",
+        "+map",
+        "de_mirage"
+      ],
+      "cwd": "C:/CS2Platform/runtime/server02/game/bin/win64",
+      "demo_dir": "C:/CS2Platform/runtime/server02/game/csgo",
+      "rcon_host": "127.0.0.1",
+      "rcon_port": 27016,
+      "rcon_password": "TROQUE_A_SENHA_RCON_SERVER02"
+    }
   ]
 }
