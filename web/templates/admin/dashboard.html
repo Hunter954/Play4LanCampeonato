@@ -1,22 +1,115 @@
-{% extends 'base.html' %}{% block content %}
-<div class="title-row"><h1>Central do árbitro</h1><a class="button" href="/admin/tournaments/create">Novo campeonato</a></div>
-<h2>Servidores</h2>
-<div class="grid">
-{% for s in servers %}
-  <div class="card server-card">
-    <span class="status {{s.status|lower}}">● {{s.status}}</span>
-    <h3>{{s.display_name or s.code}}</h3>
-    <p>{{s.host_id or 'Sem host'}} · {{s.last_heartbeat or 'sem heartbeat'}}</p>
-    {% if s.host_id %}
-    <div class="actions">
-      <a class="button secondary" href="{{ url_for('admin.server_detail',code=s.code) }}">Abrir console</a>
-      <form method="post" action="/admin/servers/{{s.code}}/START"><button>Iniciar</button></form>
-      <form method="post" action="/admin/servers/{{s.code}}/RESTART"><button class="secondary">Reiniciar</button></form>
-      <form method="post" action="/admin/servers/{{s.code}}/STOP"><button class="danger">Parar</button></form>
+{% extends 'base.html' %}
+{% block title %}Central de Operações · PLAY4LAN{% endblock %}
+{% block content %}
+<div class="admin-page" id="admin-dashboard">
+  <section class="admin-hero">
+    <div>
+      <span class="eyebrow"><i class="bi bi-broadcast-pin"></i> PLAY4LAN CONTROL CENTER</span>
+      <h1>Central de Operações</h1>
+      <p>Servidores, partidas e inscrições em uma visão rápida. Os estados abaixo atualizam automaticamente.</p>
     </div>
-    {% endif %}
+    <div class="hero-actions">
+      <a class="button secondary" href="#servers"><i class="bi bi-hdd-rack"></i> Ver servidores</a>
+      <a class="button" href="/admin/tournaments/create"><i class="bi bi-plus-lg"></i> Novo campeonato</a>
+    </div>
+  </section>
+
+  <section class="overview-grid" aria-label="Resumo operacional">
+    <div class="overview-card">
+      <span class="overview-icon"><i class="bi bi-server"></i></span>
+      <div><span>Servidores online</span><b id="summary-servers-online">{{ online_count }}</b><small>de {{ servers|length }} cadastrados</small></div>
+    </div>
+    <div class="overview-card">
+      <span class="overview-icon"><i class="bi bi-people-fill"></i></span>
+      <div><span>Jogadores conectados</span><b id="summary-players">{{ players_total }}</b><small>telemetria ao vivo</small></div>
+    </div>
+    <div class="overview-card">
+      <span class="overview-icon"><i class="bi bi-person-check-fill"></i></span>
+      <div><span>Inscrições pendentes</span><b id="summary-pending">{{ pending_count }}</b><small>aguardando análise</small></div>
+    </div>
+    <div class="overview-card">
+      <span class="overview-icon"><i class="bi bi-trophy-fill"></i></span>
+      <div><span>Partidas recentes</span><b>{{ matches|length }}</b><small>últimos registros</small></div>
+    </div>
+  </section>
+
+  <section class="quick-launch">
+    <div class="section-heading">
+      <div><span class="section-kicker">ATALHOS</span><h2>Ações rápidas</h2></div>
+    </div>
+    <div class="quick-grid">
+      <a href="/admin/tournaments/create" class="quick-card"><i class="bi bi-trophy"></i><span><b>Novo campeonato</b><small>Criar chave e configurações</small></span><i class="bi bi-arrow-right"></i></a>
+      <a href="#servers" class="quick-card"><i class="bi bi-hdd-rack"></i><span><b>Gerenciar servidores</b><small>Status, jogadores e RCON</small></span><i class="bi bi-arrow-right"></i></a>
+      <a href="#registrations" class="quick-card"><i class="bi bi-person-check"></i><span><b>Revisar inscrições</b><small>{{ pending_count }} pendente(s)</small></span><i class="bi bi-arrow-right"></i></a>
+      <a href="#matches" class="quick-card"><i class="bi bi-controller"></i><span><b>Acompanhar partidas</b><small>Operação e histórico</small></span><i class="bi bi-arrow-right"></i></a>
+    </div>
+  </section>
+
+  <section id="servers" class="admin-section">
+    <div class="section-heading">
+      <div><span class="section-kicker">INFRAESTRUTURA</span><h2>Servidores</h2></div>
+      <div class="live-pill"><span class="live-dot"></span> Atualização automática</div>
+    </div>
+
+    <div class="server-grid">
+      {% for s in servers %}
+      {% set tel = server_states.get(s.code, {}) %}
+      <article class="server-tile" data-server-code="{{ s.code }}">
+        <div class="server-tile-head">
+          <div class="server-identity">
+            <span class="server-icon"><i class="bi bi-server"></i></span>
+            <div><span class="server-code">{{ s.code }}</span><h3>{{ s.display_name or s.code }}</h3></div>
+          </div>
+          <span class="status-badge {{ s.status|lower }}" data-role="status"><span></span>{{ s.status }}</span>
+        </div>
+        <div class="server-live-metrics">
+          <div><i class="bi bi-map"></i><span>Mapa</span><b data-role="map">{{ tel.get('map','—') }}</b></div>
+          <div><i class="bi bi-people"></i><span>Jogadores</span><b data-role="players">{{ tel.get('player_count',0) }}/10</b></div>
+          <div><i class="bi bi-terminal"></i><span>RCON</span><b data-role="rcon">{{ 'OK' if tel.get('rcon_ok') else ('ERRO' if tel.get('online') else '—') }}</b></div>
+        </div>
+        <div class="server-foot">
+          <span class="heartbeat"><i class="bi bi-heart-pulse"></i> <span data-role="heartbeat">{{ s.last_heartbeat or 'Sem heartbeat' }}</span></span>
+          <a class="button secondary" href="{{ url_for('admin.server_detail', code=s.code) }}"><i class="bi bi-sliders"></i> Gerenciar</a>
+        </div>
+      </article>
+      {% else %}
+      <div class="empty-card"><i class="bi bi-cloud-slash"></i><h3>Nenhum Agent conectado</h3><p>Assim que o Agent PLAY4LAN enviar heartbeat, os servidores aparecerão aqui.</p></div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="admin-two-column">
+    <section id="registrations" class="admin-section compact-section">
+      <div class="section-heading"><div><span class="section-kicker">EQUIPES</span><h2>Inscrições</h2></div></div>
+      <div class="list-panel">
+        {% for r in regs %}
+        <div class="admin-list-row" data-registration-id="{{ r.id }}">
+          <div class="list-avatar"><i class="bi bi-people-fill"></i></div>
+          <div class="list-main"><b>{{ r.team.name }}</b><span>{{ r.tournament.name }}</span></div>
+          <span class="soft-badge {{ r.status|lower }}">{{ r.status }}</span>
+          {% if r.status == 'PENDING' %}
+          <div class="row-actions">
+            <form class="js-async-form" method="post" action="/admin/registration/{{r.id}}/APPROVED"><button class="icon-button good" title="Aprovar"><i class="bi bi-check-lg"></i></button></form>
+            <form class="js-async-form" method="post" action="/admin/registration/{{r.id}}/REJECTED"><button class="icon-button danger" title="Recusar"><i class="bi bi-x-lg"></i></button></form>
+          </div>
+          {% endif %}
+        </div>
+        {% else %}<div class="empty-inline"><i class="bi bi-inbox"></i> Nenhuma inscrição registrada.</div>{% endfor %}
+      </div>
+    </section>
+
+    <section id="matches" class="admin-section compact-section">
+      <div class="section-heading"><div><span class="section-kicker">COMPETITIVO</span><h2>Partidas recentes</h2></div></div>
+      <div class="list-panel">
+        {% for m in matches %}
+        <div class="admin-list-row">
+          <div class="list-avatar"><i class="bi bi-crosshair"></i></div>
+          <div class="list-main"><b>{{ m.team1.name if m.team1 else 'A definir' }} <span class="vs">vs</span> {{ m.team2.name if m.team2 else 'A definir' }}</b><span>{{ m.current_map or 'Mapa não definido' }} · BO{{ m.best_of }}</span></div>
+          <span class="soft-badge {{ m.status|lower }}">{{ m.status }}</span>
+        </div>
+        {% else %}<div class="empty-inline"><i class="bi bi-controller"></i> Nenhuma partida registrada.</div>{% endfor %}
+      </div>
+    </section>
   </div>
-{% else %}<div class="card">Nenhum Agent conectado.</div>{% endfor %}
 </div>
-<h2>Inscrições pendentes</h2><div class="panel">{% for r in regs %}<div class="member"><span>{{r.team.name}} → {{r.tournament.name}}</span><b>{{r.status}}</b>{% if r.status=='PENDING' %}<form method="post" action="/admin/registration/{{r.id}}/APPROVED"><button>Aprovar</button></form><form method="post" action="/admin/registration/{{r.id}}/REJECTED"><button class="danger">Recusar</button></form>{% endif %}</div>{% else %}<p>Nenhuma inscrição.</p>{% endfor %}</div>
 {% endblock %}

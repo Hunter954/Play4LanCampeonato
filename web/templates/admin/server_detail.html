@@ -1,91 +1,141 @@
 {% extends 'base.html' %}
-{% block title %}{{ server.display_name or server.code }} · Admin{% endblock %}
+{% block title %}{{ server.display_name or server.code }} · PLAY4LAN{% endblock %}
 {% block content %}
-<div class="title-row">
-  <div>
-    <span class="eyebrow">{{ server.host_id or 'HOST NÃO VINCULADO' }}</span>
-    <h1>{{ server.display_name or server.code }}</h1>
-  </div>
-  <span class="server-big-status {{ server.status|lower }}">● {{ server.status }}</span>
-</div>
+<div class="admin-page server-admin-page" id="server-admin" data-server-code="{{ server.code }}">
+  <a href="{{ url_for('admin.dashboard') }}" class="back-link"><i class="bi bi-arrow-left"></i> Central de Operações</a>
 
-<div class="server-meta-grid">
-  <div class="stat-card"><span>Mapa</span><b>{{ telemetry.get('map','—') }}</b></div>
-  <div class="stat-card"><span>Players</span><b>{{ telemetry.get('player_count',0) }}</b></div>
-  <div class="stat-card"><span>RCON</span><b>{{ 'OK' if telemetry.get('rcon_ok') else ('ERRO' if telemetry.get('online') else '—') }}</b></div>
-  <div class="stat-card"><span>Heartbeat</span><b>{{ server.last_heartbeat or '—' }}</b></div>
-</div>
-{% if telemetry.get('rcon_error') %}<div class="flash danger"><b>RCON:</b> {{ telemetry.get('rcon_error') }}</div>{% endif %}
-
-<div class="server-layout">
-  <section>
-    <div class="panel">
-      <div class="title-row"><h2>Jogadores conectados</h2><form method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='STATUS') }}"><button class="secondary">Atualizar status</button></form></div>
-      <div class="player-table">
-        <div class="player-row player-head"><span>UserID</span><span>Nickname</span><span>Steam</span><span>Ping</span><span></span></div>
-        {% for p in telemetry.get('players',[]) %}
-        <div class="player-row">
-          <span>#{{ p.get('userid','?') }}</span>
-          <strong>{{ p.get('name','?') }}</strong>
-          <code>{{ p.get('steam','?') }}</code>
-          <span>{{ p.get('ping','?') }} ms</span>
-          <form method="post" action="{{ url_for('admin.server_kick',code=server.code) }}"><input type="hidden" name="userid" value="{{ p.get('userid') }}"><button class="danger small">Kick</button></form>
-        </div>
-        {% else %}
-        <div class="empty-state">Nenhum jogador foi identificado pelo último <code>status</code>. Se houver jogadores conectados, clique em Atualizar status.</div>
-        {% endfor %}
+  <section class="server-hero">
+    <div class="server-hero-main">
+      <span class="server-icon large"><i class="bi bi-server"></i></span>
+      <div>
+        <span class="eyebrow">{{ server.host_id or 'HOST NÃO VINCULADO' }}</span>
+        <h1>{{ server.display_name or server.code }}</h1>
+        <div class="server-hero-sub"><span>{{ server.code }}</span><span>•</span><span data-role="hero-map">{{ telemetry.get('map','Aguardando mapa') }}</span></div>
       </div>
     </div>
-
-    <div class="panel command-panel">
-      <h2>Console RCON</h2>
-      <form method="post" action="{{ url_for('admin.server_rcon',code=server.code) }}" class="command-form">
-        <input name="command" autocomplete="off" placeholder="status, sv_cheats, mp_restartgame 1..." required>
-        <button>Enviar</button>
-      </form>
-      <p class="muted">Console bruto disponível apenas para administrador. As ações competitivas depois serão transformadas em botões/regras próprias da plataforma.</p>
-    </div>
-
-    <div class="panel">
-      <h2>Últimos comandos</h2>
-      <div class="command-history">
-        {% for c in commands %}
-        <div class="command-item">
-          <div><b>#{{ c.id }} · {{ c.command }}</b> <span class="cmd-status {{ c.status|lower }}">{{ c.status }}</span></div>
-          {% if c.payload.get('command') %}<code>&gt; {{ c.payload.get('command') }}</code>{% endif %}
-          {% if c.payload.get('_result') %}<pre>{{ c.payload.get('_result') }}</pre>{% endif %}
-          {% if c.payload.get('_error') %}<div class="command-error">{{ c.payload.get('_error') }}</div>{% endif %}
-        </div>
-        {% else %}<p class="muted">Nenhum comando enviado.</p>{% endfor %}
+    <div class="server-hero-actions">
+      <span class="status-badge large {{ server.status|lower }}" data-role="server-status"><span></span>{{ server.status }}</span>
+      <div class="process-actions">
+        <form class="js-async-form" data-pending-status="INICIANDO" method="post" action="/admin/servers/{{server.code}}/START"><button class="button good"><i class="bi bi-play-fill"></i> Iniciar</button></form>
+        <form class="js-async-form" data-confirm="Reiniciar o processo do servidor?" data-pending-status="REINICIANDO" method="post" action="/admin/servers/{{server.code}}/RESTART"><button class="button secondary"><i class="bi bi-arrow-clockwise"></i> Reiniciar</button></form>
+        <form class="js-async-form" data-confirm="Parar completamente este servidor?" data-pending-status="PARANDO" method="post" action="/admin/servers/{{server.code}}/STOP"><button class="button danger"><i class="bi bi-stop-fill"></i> Parar</button></form>
       </div>
     </div>
   </section>
 
-  <aside>
-    <div class="panel sticky-panel">
-      <h2>Controle do servidor</h2>
-      <div class="stack-actions">
-        <form method="post" action="/admin/servers/{{server.code}}/START"><button>Iniciar servidor</button></form>
-        <form method="post" action="/admin/servers/{{server.code}}/RESTART"><button class="secondary">Reiniciar processo</button></form>
-        <form method="post" action="/admin/servers/{{server.code}}/STOP"><button class="danger">Parar servidor</button></form>
-      </div>
+  <section class="server-metrics">
+    <div class="metric-card"><span class="metric-icon"><i class="bi bi-map"></i></span><div><span>Mapa atual</span><b data-role="metric-map">{{ telemetry.get('map','—') }}</b></div></div>
+    <div class="metric-card"><span class="metric-icon"><i class="bi bi-people-fill"></i></span><div><span>Jogadores</span><b data-role="metric-players">{{ telemetry.get('player_count',0) }}/10</b></div></div>
+    <div class="metric-card"><span class="metric-icon"><i class="bi bi-terminal-fill"></i></span><div><span>RCON</span><b data-role="metric-rcon">{{ 'Conectado' if telemetry.get('rcon_ok') else ('Com erro' if telemetry.get('online') else '—') }}</b></div></div>
+    <div class="metric-card"><span class="metric-icon"><i class="bi bi-heart-pulse-fill"></i></span><div><span>Último heartbeat</span><b class="small-value" data-role="metric-heartbeat">{{ server.last_heartbeat or '—' }}</b></div></div>
+  </section>
 
-      <h3>Partida / teste</h3>
-      <div class="stack-actions">
-        <form method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='WARMUP_END') }}"><button>Encerrar warmup</button></form>
-        <form method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='RESTART_ROUND') }}"><button class="secondary">Reiniciar jogo (1s)</button></form>
-        <form method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='PAUSE') }}"><button class="secondary">Pausar</button></form>
-        <form method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='UNPAUSE') }}"><button class="secondary">Retomar</button></form>
-      </div>
+  <div id="rcon-warning" class="notice danger {% if not telemetry.get('rcon_error') %}is-hidden{% endif %}"><i class="bi bi-exclamation-triangle-fill"></i><div><b>Falha no RCON</b><span data-role="rcon-error">{{ telemetry.get('rcon_error','') }}</span></div></div>
 
-      <h3>Trocar mapa</h3>
-      <form method="post" action="{{ url_for('admin.server_change_map',code=server.code) }}">
-        <select name="map_name">
-          <option>de_mirage</option><option>de_inferno</option><option>de_nuke</option><option>de_ancient</option><option>de_anubis</option><option>de_dust2</option><option>de_train</option>
-        </select>
-        <button class="secondary">Carregar mapa</button>
-      </form>
+  <div class="server-workspace">
+    <div class="server-primary">
+      <section class="admin-panel players-panel">
+        <div class="panel-heading">
+          <div><span class="section-kicker">AO VIVO</span><h2>Jogadores conectados</h2><p>Lista atualizada automaticamente pela telemetria do Agent.</p></div>
+          <form class="js-async-form" method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='STATUS') }}"><button class="button ghost"><i class="bi bi-arrow-repeat"></i> Sincronizar agora</button></form>
+        </div>
+        <div class="players-summary"><span><span class="live-dot"></span> Telemetria ativa</span><b><span data-role="players-online">{{ telemetry.get('player_count',0) }}</span> jogadores</b></div>
+        <div class="player-table premium-table" id="players-table">
+          <div class="player-row player-head"><span>UserID</span><span>Nickname</span><span>Steam</span><span>Ping</span><span>Ação</span></div>
+          <div id="players-table-body" class="player-table-body">
+          {% for p in telemetry.get('players',[]) %}
+            <div class="player-row" data-player-userid="{{ p.get('userid') }}">
+              <span class="userid">#{{ p.get('userid','?') }}</span>
+              <strong><span class="player-presence"></span>{{ p.get('name','?') }}</strong>
+              <code>{{ p.get('steam','?') }}</code>
+              <span>{{ p.get('ping','?') }} ms</span>
+              <form class="js-async-form" data-confirm="Remover {{ p.get('name','este jogador') }} do servidor?" method="post" action="{{ url_for('admin.server_kick',code=server.code) }}"><input type="hidden" name="userid" value="{{ p.get('userid') }}"><button class="icon-button danger" title="Expulsar jogador"><i class="bi bi-person-x"></i></button></form>
+            </div>
+          {% else %}
+            <div class="empty-state" id="players-empty"><i class="bi bi-person-dash"></i><div><b>Nenhum jogador conectado</b><span>A lista será preenchida automaticamente quando jogadores entrarem no servidor.</span></div></div>
+          {% endfor %}
+          </div>
+        </div>
+      </section>
+
+      <section class="admin-panel">
+        <div class="panel-heading"><div><span class="section-kicker">COMPETITIVO</span><h2>Controle da partida</h2><p>Ações operacionais separadas do controle do processo.</p></div></div>
+        <div class="operation-grid">
+          <form class="js-async-form operation-card" method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='READY_STATUS') }}"><button><i class="bi bi-person-check-fill"></i><span><b>Status de prontidão</b><small>Consultar 5/5 de cada equipe</small></span></button></form>
+          <form class="js-async-form operation-card featured" data-confirm="Iniciar o round faca? O PLAY4LAN só permitirá com 5/5 x 5/5 prontos." method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='KNIFE') }}"><button><i class="bi bi-lightning-charge-fill"></i><span><b>Iniciar round faca</b><small>Dispara o fluxo competitivo PLAY4LAN</small></span></button></form>
+          <form class="js-async-form operation-card" method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='SCORE') }}"><button><i class="bi bi-bar-chart-fill"></i><span><b>Consultar placar</b><small>Solicitar placar atual no servidor</small></span></button></form>
+          <form class="js-async-form operation-card" method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='PAUSES') }}"><button><i class="bi bi-hourglass-split"></i><span><b>Consultar pausas</b><small>Ver saldo de pausas das equipes</small></span></button></form>
+        </div>
+
+        <div class="action-groups">
+          <div class="action-group">
+            <div class="action-group-title"><i class="bi bi-pause-circle"></i><span><b>Pausa e retomada</b><small>Controles administrativos</small></span></div>
+            <div class="button-row">
+              <form class="js-async-form" method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='PAUSE') }}"><button class="button secondary"><i class="bi bi-pause-fill"></i> Pausar</button></form>
+              <form class="js-async-form" method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='UNPAUSE') }}"><button class="button secondary"><i class="bi bi-play-fill"></i> Retomar Valve</button></form>
+              <form class="js-async-form" method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='RESUME_PLAY4LAN') }}"><button class="button secondary"><i class="bi bi-shield-check"></i> Retomar PLAY4LAN</button></form>
+            </div>
+          </div>
+          <div class="action-group">
+            <div class="action-group-title"><i class="bi bi-arrow-counterclockwise"></i><span><b>Warmup e round</b><small>Ações de teste/manutenção</small></span></div>
+            <div class="button-row">
+              <form class="js-async-form" data-confirm="Encerrar o warmup manualmente?" method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='WARMUP_END') }}"><button class="button ghost"><i class="bi bi-skip-end-fill"></i> Encerrar warmup</button></form>
+              <form class="js-async-form" data-confirm="Reiniciar o jogo em 1 segundo?" method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='RESTART_ROUND') }}"><button class="button ghost"><i class="bi bi-arrow-clockwise"></i> Restart 1s</button></form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="admin-panel">
+        <div class="panel-heading"><div><span class="section-kicker">HISTÓRICO</span><h2>Últimos comandos</h2><p>Resultado das ações executadas pelo Agent.</p></div></div>
+        <div class="command-history" id="command-history">
+          {% for c in commands %}
+          <div class="command-item" data-command-id="{{ c.id }}">
+            <div class="command-top"><div><b>#{{ c.id }} · {{ c.command }}</b>{% if c.payload.get('command') %}<code>&gt; {{ c.payload.get('command') }}</code>{% endif %}</div><span class="cmd-status {{ c.status|lower }}">{{ c.status }}</span></div>
+            {% if c.payload.get('_result') %}<pre>{{ c.payload.get('_result') }}</pre>{% endif %}
+            {% if c.payload.get('_error') %}<div class="command-error"><i class="bi bi-exclamation-circle"></i> {{ c.payload.get('_error') }}</div>{% endif %}
+          </div>
+          {% else %}<div class="empty-inline"><i class="bi bi-clock-history"></i> Nenhum comando enviado.</div>{% endfor %}
+        </div>
+      </section>
+
+      <details class="admin-panel advanced-console">
+        <summary><span><i class="bi bi-terminal"></i><b>Console RCON avançado</b><small>Uso administrativo. Abra somente quando precisar de um comando manual.</small></span><i class="bi bi-chevron-down"></i></summary>
+        <div class="advanced-console-body">
+          <form class="js-async-form command-form" method="post" action="{{ url_for('admin.server_rcon',code=server.code) }}">
+            <input name="command" autocomplete="off" placeholder="Ex.: status, sv_cheats, mp_restartgame 1..." required>
+            <button><i class="bi bi-send-fill"></i> Enviar</button>
+          </form>
+        </div>
+      </details>
     </div>
-  </aside>
+
+    <aside class="server-sidebar">
+      <section class="admin-panel compact-panel">
+        <div class="side-title"><i class="bi bi-map-fill"></i><div><b>Trocar mapa</b><span>Carregamento imediato</span></div></div>
+        <form class="js-async-form" data-confirm="Trocar o mapa atual? Isso interrompe o estado atual do jogo." method="post" action="{{ url_for('admin.server_change_map',code=server.code) }}">
+          <select name="map_name">
+            <option value="de_mirage">Mirage</option><option value="de_inferno">Inferno</option><option value="de_nuke">Nuke</option><option value="de_ancient">Ancient</option><option value="de_anubis">Anubis</option><option value="de_dust2">Dust II</option><option value="de_train">Train</option>
+          </select>
+          <button class="button secondary full"><i class="bi bi-arrow-repeat"></i> Carregar mapa</button>
+        </form>
+      </section>
+
+      <section class="admin-panel compact-panel server-health">
+        <div class="side-title"><i class="bi bi-activity"></i><div><b>Saúde do servidor</b><span>Conectividade operacional</span></div></div>
+        <div class="health-list">
+          <div><span>Agent</span><b data-role="health-agent"><i class="bi bi-circle-fill"></i> Conectado</b></div>
+          <div><span>Processo CS2</span><b data-role="health-process">{{ server.status }}</b></div>
+          <div><span>RCON</span><b data-role="health-rcon">{{ 'OK' if telemetry.get('rcon_ok') else '—' }}</b></div>
+          <div><span>Host</span><code>{{ server.host_id or '—' }}</code></div>
+        </div>
+      </section>
+
+      <section class="admin-panel compact-panel help-card">
+        <div class="side-title"><i class="bi bi-info-circle-fill"></i><div><b>PLAY4LAN Competitive</b><span>Operação recomendada</span></div></div>
+        <p>Para partidas oficiais, use os botões PLAY4LAN acima. O console RCON fica reservado para manutenção e diagnóstico.</p>
+      </section>
+    </aside>
+  </div>
 </div>
 {% endblock %}
