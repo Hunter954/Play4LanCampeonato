@@ -16,10 +16,10 @@ jobs:
       - name: Checkout PLAY4LAN
         uses: actions/checkout@v4
 
-      - name: Instalar .NET 8
+      - name: Instalar .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "10.0.x"
 
       - name: Baixar motor base MatchZy 0.8.15
         run: |
@@ -28,7 +28,9 @@ jobs:
           git checkout ef289d512766b89b0f7bf3088208ae88235e61fa
 
       - name: Aplicar regras e identidade PLAY4LAN
-        run: python PLAY4LANCompetitive/build_transform.py
+        run: |
+          python PLAY4LANCompetitive/build_transform.py
+          python PLAY4LANCompetitive/build_fix.py
 
       - name: Compilar PLAY4LAN Competitive
         run: |
