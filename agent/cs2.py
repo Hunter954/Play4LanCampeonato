@@ -149,6 +149,28 @@ def parse_play4lan_players(text: str):
     return players
 
 
+
+def parse_play4lan_state(text: str):
+    marker = 'PLAY4LAN_STATE_JSON '
+    raw = text or ''
+    idx = raw.find(marker)
+    if idx < 0:
+        return None
+    payload = raw[idx + len(marker):].strip()
+    try:
+        state, _ = json.JSONDecoder().raw_decode(payload)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(state, dict):
+        return None
+    players = state.get('players') if isinstance(state.get('players'), list) else []
+    state['players'] = players
+    state['player_count'] = len(players)
+    state['player_source'] = 'play4lan_state'
+    state['play4lan_plugin_ok'] = True
+    return state
+
+
 def merge_player_sources(structured, status_players):
     status_players = status_players or []
     by_userid = {str(p.get('userid')): p for p in status_players if p.get('userid') is not None}
@@ -264,38 +286,29 @@ class CS2Process:
         if self.status != 'ONLINE':
             return {'online': False, 'rcon_ok': False, 'players': [], 'player_count': 0, 'player_source': 'offline'}
 
+        # Fonte principal 1.0.6: estado completo estruturado do plugin.
+        state_result = self.rcon('css_play4lan_state')
+        state_data = parse_play4lan_state(state_result.get('result', '')) if state_result.get('ok') else None
+        if state_data is not None:
+            state_data.update({'online': True, 'rcon_ok': True})
+            return state_data
+
+        # Compatibilidade com 1.0.4/1.0.5.
         status_result = self.rcon('status')
-        status_data = parse_status(status_result.get('result', '')) if status_result.get('ok') else {
-            'players': [], 'player_count': 0
-        }
-
-        # Fonte principal: o nosso próprio plugin, sem depender do formato textual
-        # do `status` e sem depender de cadastro/login Steam no site.
+        status_data = parse_status(status_result.get('result', '')) if status_result.get('ok') else {'players': [], 'player_count': 0}
         play4lan_result = self.rcon('css_play4lan_players')
-        structured_players = None
-        if play4lan_result.get('ok'):
-            structured_players = parse_play4lan_players(play4lan_result.get('result', ''))
-
+        structured_players = parse_play4lan_players(play4lan_result.get('result', '')) if play4lan_result.get('ok') else None
         if structured_players is not None:
-            players = merge_player_sources(structured_players, status_data.get('players', []))
-            status_data['players'] = players
-            status_data['player_count'] = len(players)
+            status_data['players'] = merge_player_sources(structured_players, status_data.get('players', []))
+            status_data['player_count'] = len(status_data['players'])
             status_data['player_source'] = 'play4lan_plugin'
             status_data['play4lan_plugin_ok'] = True
         else:
-            # Compatibilidade temporária com plugin antigo: ainda tentamos o
-            # parser de `status`, mas sinalizamos no painel qual fonte foi usada.
             status_data['player_source'] = 'status_fallback'
             status_data['play4lan_plugin_ok'] = False
-            if play4lan_result.get('error'):
-                status_data['play4lan_plugin_error'] = play4lan_result.get('error')
-
-        status_data.update({
-            'online': True,
-            'rcon_ok': bool(status_result.get('ok') or play4lan_result.get('ok')),
-        })
+        status_data.update({'online': True, 'rcon_ok': bool(status_result.get('ok') or play4lan_result.get('ok'))})
         if not status_data['rcon_ok']:
-            status_data['rcon_error'] = status_result.get('error') or play4lan_result.get('error')
+            status_data['rcon_error'] = status_result.get('error') or play4lan_result.get('error') or state_result.get('error')
         return status_data
 
     def execute(self, command, payload):

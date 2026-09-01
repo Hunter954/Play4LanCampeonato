@@ -65,3 +65,10 @@ class Demo(db.Model):
 
 class Incident(db.Model):
     id=db.Column(db.Integer, primary_key=True); match_id=db.Column(db.Integer, db.ForeignKey('match.id')); description=db.Column(db.Text, nullable=False); created_at=db.Column(db.DateTime, default=now)
+
+
+class AdminSetting(db.Model):
+    id=db.Column(db.Integer, primary_key=True)
+    key=db.Column(db.String(100), unique=True, nullable=False, index=True)
+    value=db.Column(db.Text, nullable=False)
+    updated_at=db.Column(db.DateTime, default=now, onupdate=now)
