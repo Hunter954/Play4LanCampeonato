@@ -36,6 +36,7 @@ jobs:
           python PLAY4LANCompetitive/build_ready_v103.py
           python PLAY4LANCompetitive/build_telemetry_v104.py
           python PLAY4LANCompetitive/build_test_v105.py
+          python PLAY4LANCompetitive/build_webops_v106.py
 
       - name: Compilar PLAY4LAN Competitive
         run: |
@@ -47,7 +48,7 @@ jobs:
           mkdir -p artifact/cfg
           cp -r upstream/cfg/PLAY4LAN artifact/cfg/PLAY4LAN
           cat > artifact/INSTALAR_PLAY4LAN.txt <<'EOF'
-          PLAY4LAN COMPETITIVE 1.0.5 - MODO TESTE
+          PLAY4LAN COMPETITIVE 1.0.6 - PAINEL COMPLETO / MODO TESTE
 
           1. PARE O SERVER 01.
           2. SUBSTITUA A PASTA:
@@ -58,29 +59,33 @@ jobs:
           5. NO CONSOLE DIGITE:
              css_plugins list
 
-          Deve aparecer: PLAY4LAN Competitive 1.0.5 by PLAY4LAN
+          Deve aparecer: PLAY4LAN Competitive 1.0.6 by PLAY4LAN
 
-          MODO TESTE DESTA BUILD:
+          ALTERACOES:
           - .espera substitui .naopronto
-          - 1 jogador usando .pronto inicia a partida automaticamente
-          - play4lan_test_mode 1 liga teste solo
+          - modo teste: 1 jogador com .pronto inicia ROUND FACA, nao LIVE direto
+          - estado web completo: mapa, fase, pausa e placar
+          - jogadores: vida, colete, dinheiro, K/D/A, dano, arma, ping e pronto
+          - chat recente para o painel
+          - backups PLAY4LAN disponíveis no painel
+          - pronto/espera, pausa, retomada e restore controláveis pelo painel
           - play4lan_test_mode 0 restaura a regra oficial 5/5 x 5/5
-          - ao voltar para producao, use play4lan_test_mode 0
           EOF
 
       - name: Verificar pacote
         run: |
           test -f artifact/addons/counterstrikesharp/plugins/PLAY4LANCompetitive/PLAY4LANCompetitive.dll
-          grep -R 'ModuleVersion => "1.0.5"' upstream/MatchZy.cs
+          grep -R 'ModuleVersion => "1.0.6"' upstream/MatchZy.cs
           grep -R 'ConsoleCommand("css_espera"' upstream/ConsoleCommands.cs
-          grep -R "play4lanTestMode = true" upstream/MatchZy.cs
-          grep -R "play4lan_test_mode" upstream/Play4LanTestMode.cs
-          grep -R "css_play4lan_players" upstream/Play4LanTelemetry.cs
+          grep -R "css_play4lan_state" upstream/Play4LanWebOps.cs
+          grep -R "css_play4lan_ready" upstream/Play4LanWebOps.cs
+          grep -R "css_play4lan_restore" upstream/Play4LanWebOps.cs
+          grep -R "Iniciando ROUND FACA" upstream/Utility.cs
 
       - name: Enviar pacote compilado
         uses: actions/upload-artifact@v4
         with:
-          name: PLAY4LANCompetitive-v1.0.5-TESTE-SOLO-SERVER01
+          name: PLAY4LANCompetitive-v1.0.6-TESTE-SOLO-SERVER01
           path: artifact
           if-no-files-found: error
           retention-days: 30
