@@ -32,6 +32,7 @@ jobs:
           python PLAY4LANCompetitive/build_transform.py
           python PLAY4LANCompetitive/build_fix.py
           python PLAY4LANCompetitive/build_fix2.py
+          python PLAY4LANCompetitive/build_ready_v102.py
 
       - name: Compilar PLAY4LAN Competitive
         run: |
@@ -43,35 +44,43 @@ jobs:
           mkdir -p artifact/cfg
           cp -r upstream/cfg/PLAY4LAN artifact/cfg/PLAY4LAN
           cat > artifact/INSTALAR_PLAY4LAN.txt <<'EOF'
-          PLAY4LAN COMPETITIVE 1.0.1
+          PLAY4LAN COMPETITIVE 1.0.2
 
           1. PARE O SERVER 01.
-          2. APAGUE/RENOMEIE:
-             game\csgo\addons\counterstrikesharp\plugins\MatchZy
+          2. SUBSTITUA A PASTA:
+             game\csgo\addons\counterstrikesharp\plugins\PLAY4LANCompetitive
           3. EXTRAIA O CONTEUDO DESTE PACOTE DIRETAMENTE EM:
              C:\CS2Platform\runtime\server01\game\csgo\
           4. INICIE O SERVER 01.
           5. NO CONSOLE DIGITE:
              css_plugins list
 
-          Deve aparecer: PLAY4LAN Competitive 1.0.1 by PLAY4LAN
+          Deve aparecer: PLAY4LAN Competitive 1.0.2 by PLAY4LAN
+
+          CHECK-IN OFICIAL:
+          - exatamente 5 jogadores por equipe
+          - todos os 5 devem usar .pronto
+          - o round faca fica bloqueado ate 5/5 x 5/5
+          - .status ou .prontos mostra o painel de prontidao
 
           Comandos oficiais:
-          .pronto .naopronto .faca .ficar .trocar .pause .tac .tec .voltar .placar .pausas .comandos
+          .pronto .naopronto .status .prontos .faca .ficar .trocar .pause .tac .tec .voltar .placar .pausas .comandos
           EOF
 
       - name: Verificar pacote
         run: |
           test -f artifact/addons/counterstrikesharp/plugins/PLAY4LANCompetitive/PLAY4LANCompetitive.dll
-          grep -R "PLAY4LAN Competitive" upstream/MatchZy.cs
+          grep -R 'ModuleVersion => "1.0.2"' upstream/MatchZy.cs
+          grep -R "IsPlay4LanFullReady" upstream/Play4LanReadyVisual.cs
+          grep -R "5/5 x 5/5" upstream/Play4LanReadyVisual.cs
           grep -R "css_pronto" upstream/ConsoleCommands.cs
+          grep -R "css_status" upstream/Play4LanReadyVisual.cs
           grep -R "css_pause" upstream/Play4LanCommands.cs
-          grep -R "css_tac" upstream/Play4LanCommands.cs
 
       - name: Enviar pacote compilado
         uses: actions/upload-artifact@v4
         with:
-          name: PLAY4LANCompetitive-v1.0.1-SERVER01
+          name: PLAY4LANCompetitive-v1.0.2-SERVER01
           path: artifact
           if-no-files-found: error
           retention-days: 30
