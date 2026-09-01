@@ -31,6 +31,7 @@ jobs:
         run: |
           python PLAY4LANCompetitive/build_transform.py
           python PLAY4LANCompetitive/build_fix.py
+          python PLAY4LANCompetitive/build_fix2.py
 
       - name: Compilar PLAY4LAN Competitive
         run: |
