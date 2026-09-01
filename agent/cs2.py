@@ -1,3 +1,4 @@
+import json
 import re
 import socket
 import subprocess
@@ -109,6 +110,62 @@ def parse_status(text: str) -> dict:
     return data
 
 
+def parse_play4lan_players(text: str):
+    marker = 'PLAY4LAN_PLAYERS_JSON '
+    raw = text or ''
+    idx = raw.find(marker)
+    if idx < 0:
+        return None
+    payload = raw[idx + len(marker):].strip()
+    # Algumas implementações RCON podem acrescentar uma nova linha depois da resposta.
+    first_line = payload.splitlines()[0].strip() if payload else ''
+    if not first_line:
+        return []
+    try:
+        rows = json.loads(first_line)
+    except json.JSONDecodeError:
+        # Tenta decodificar só o primeiro objeto JSON válido.
+        try:
+            rows, _ = json.JSONDecoder().raw_decode(payload)
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(rows, list):
+        return None
+    players = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        players.append({
+            'userid': _int_or(row.get('userid'), row.get('userid')),
+            'name': row.get('name') or '?',
+            'steam_id64': str(row.get('steam_id64') or ''),
+            'steam': str(row.get('steam_id64') or ''),
+            'team_num': _int_or(row.get('team_num'), 1),
+            'team': row.get('team') or 'SPEC',
+            'team_name': row.get('team_name') or 'ESPECTADOR',
+            'ready': bool(row.get('ready')),
+            'ping': '?',
+        })
+    return players
+
+
+def merge_player_sources(structured, status_players):
+    status_players = status_players or []
+    by_userid = {str(p.get('userid')): p for p in status_players if p.get('userid') is not None}
+    merged = []
+    for player in structured or []:
+        status = by_userid.get(str(player.get('userid'))) or {}
+        item = dict(player)
+        if status.get('ping') not in (None, '?'):
+            item['ping'] = status.get('ping')
+        if status.get('connected'):
+            item['connected'] = status.get('connected')
+        if status.get('state'):
+            item['state'] = status.get('state')
+        merged.append(item)
+    return merged
+
+
 class CS2Process:
     def __init__(self, cfg):
         self.cfg = cfg
@@ -205,19 +262,41 @@ class CS2Process:
 
     def telemetry(self):
         if self.status != 'ONLINE':
-            return {'online': False, 'rcon_ok': False, 'players': [], 'player_count': 0}
-        result = self.rcon('status')
-        if not result['ok']:
-            return {
-                'online': True,
-                'rcon_ok': False,
-                'rcon_error': result.get('error'),
-                'players': [],
-                'player_count': 0,
-            }
-        parsed = parse_status(result.get('result', ''))
-        parsed.update({'online': True, 'rcon_ok': True})
-        return parsed
+            return {'online': False, 'rcon_ok': False, 'players': [], 'player_count': 0, 'player_source': 'offline'}
+
+        status_result = self.rcon('status')
+        status_data = parse_status(status_result.get('result', '')) if status_result.get('ok') else {
+            'players': [], 'player_count': 0
+        }
+
+        # Fonte principal: o nosso próprio plugin, sem depender do formato textual
+        # do `status` e sem depender de cadastro/login Steam no site.
+        play4lan_result = self.rcon('css_play4lan_players')
+        structured_players = None
+        if play4lan_result.get('ok'):
+            structured_players = parse_play4lan_players(play4lan_result.get('result', ''))
+
+        if structured_players is not None:
+            players = merge_player_sources(structured_players, status_data.get('players', []))
+            status_data['players'] = players
+            status_data['player_count'] = len(players)
+            status_data['player_source'] = 'play4lan_plugin'
+            status_data['play4lan_plugin_ok'] = True
+        else:
+            # Compatibilidade temporária com plugin antigo: ainda tentamos o
+            # parser de `status`, mas sinalizamos no painel qual fonte foi usada.
+            status_data['player_source'] = 'status_fallback'
+            status_data['play4lan_plugin_ok'] = False
+            if play4lan_result.get('error'):
+                status_data['play4lan_plugin_error'] = play4lan_result.get('error')
+
+        status_data.update({
+            'online': True,
+            'rcon_ok': bool(status_result.get('ok') or play4lan_result.get('ok')),
+        })
+        if not status_data['rcon_ok']:
+            status_data['rcon_error'] = status_result.get('error') or play4lan_result.get('error')
+        return status_data
 
     def execute(self, command, payload):
         if command == 'START':

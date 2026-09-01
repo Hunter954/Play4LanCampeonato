@@ -7,6 +7,7 @@ from flask import Blueprint, abort, jsonify, redirect, request
 from web.extensions import db, socketio
 from web.models import Demo, MatchEvent, Server, ServerCommand
 from web.live_state import set_server_state
+from web.player_identity import enrich_telemetry
 from web.storage import presigned_download, upload_fileobj
 
 bp = Blueprint('api', __name__, url_prefix='/api/v1')
@@ -39,7 +40,7 @@ def heartbeat():
         row.status = server_data.get('status', 'UNKNOWN')
         row.last_heartbeat = datetime.utcnow()
 
-        telemetry = dict(server_data.get('telemetry') or {})
+        telemetry = enrich_telemetry(server_data.get('telemetry') or {})
         # O retorno bruto do comando status fica disponível no histórico RCON;
         # não precisamos trafegá-lo/gravar a cada heartbeat.
         telemetry.pop('raw', None)

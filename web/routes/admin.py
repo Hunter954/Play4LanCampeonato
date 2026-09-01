@@ -8,6 +8,7 @@ from flask_login import current_user, login_required
 from web.extensions import db, socketio
 from web.models import Match, MatchEvent, Server, ServerCommand, Tournament, TournamentRegistration
 from web.live_state import get_server_state
+from web.player_identity import enrich_telemetry
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -35,14 +36,14 @@ def _dt(value):
 def _latest_telemetry(code):
     live = get_server_state(code)
     if live is not None:
-        return dict(live.get('telemetry') or {})
+        return enrich_telemetry(live.get('telemetry') or {})
     event = (
         MatchEvent.query
         .filter_by(server_id=code, event_type='SERVER_STATUS')
         .order_by(MatchEvent.id.desc())
         .first()
     )
-    return dict(event.payload or {}) if event else {}
+    return enrich_telemetry(event.payload or {}) if event else {}
 
 
 def _server_snapshot(server, telemetry=None):

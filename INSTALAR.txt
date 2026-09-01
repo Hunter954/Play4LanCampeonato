@@ -1,0 +1,17 @@
+PLAY4LAN - DETECCAO DE JOGADORES + PAINEL REALTIME
+
+Extraia este ZIP na raiz:
+C:\CS2Platform\
+
+Substitua/mescle os arquivos.
+
+IMPORTANTE:
+- Reinicie o Agent no computador da LAN.
+- O web/ deve ser enviado/deployado no Railway.
+- Este patch funciona melhor junto do PLAY4LAN Competitive 1.0.4.
+
+NOVO FLUXO:
+CS2 -> PLAY4LAN Competitive -> css_play4lan_players -> Agent -> Railway -> painel
+
+O jogador NAO precisa ter cadastro no site para aparecer.
+Se houver conta com o mesmo SteamID64, o painel adiciona avatar/nickname/time.

@@ -40,15 +40,25 @@
           <form class="js-async-form" method="post" action="{{ url_for('admin.server_quick_action',code=server.code,action='STATUS') }}"><button class="button ghost"><i class="bi bi-arrow-repeat"></i> Sincronizar agora</button></form>
         </div>
         <div class="players-summary"><span><span class="live-dot"></span> Telemetria ativa</span><b><span data-role="players-online">{{ telemetry.get('player_count',0) }}</span> jogadores</b></div>
+        <div class="player-source-note">
+          <i class="bi bi-broadcast-pin"></i>
+          <span>Detecção direta do servidor <b>sem depender de login no site</b>.</span>
+          <span class="source-badge">{{ 'PLAY4LAN' if telemetry.get('player_source') == 'play4lan_plugin' else 'Compatibilidade' }}</span>
+        </div>
         <div class="player-table premium-table" id="players-table">
-          <div class="player-row player-head"><span>UserID</span><span>Nickname</span><span>Steam</span><span>Ping</span><span>Ação</span></div>
+          <div class="player-row player-head"><span>ID</span><span>Jogador</span><span>Lado</span><span>Pronto</span><span>SteamID64</span><span>Ping</span><span>Ação</span></div>
           <div id="players-table-body" class="player-table-body">
           {% for p in telemetry.get('players',[]) %}
             <div class="player-row" data-player-userid="{{ p.get('userid') }}">
               <span class="userid">#{{ p.get('userid','?') }}</span>
-              <strong><span class="player-presence"></span>{{ p.get('name','?') }}</strong>
-              <code>{{ p.get('steam','?') }}</code>
-              <span>{{ p.get('ping','?') }} ms</span>
+              <div class="player-identity">
+                {% if p.get('avatar_url') %}<img src="{{ p.get('avatar_url') }}" alt="">{% else %}<span class="player-avatar-fallback"><i class="bi bi-person-fill"></i></span>{% endif %}
+                <div><strong><span class="player-presence"></span>{{ p.get('name','?') }}</strong><small>{% if p.get('registered') %}<span class="account-pill registered"><i class="bi bi-patch-check-fill"></i> PLAY4LAN</span>{% if p.get('platform_teams') %} · {{ p.get('platform_teams')[0].get('tag') }}{% endif %}{% else %}<span class="account-pill guest">Não cadastrado</span>{% endif %}</small></div>
+              </div>
+              <span class="side-pill {{ p.get('team','SPEC')|lower }}">{{ p.get('team','SPEC') }}</span>
+              <span class="ready-pill {{ 'yes' if p.get('ready') else 'no' }}"><i class="bi {{ 'bi-check-circle-fill' if p.get('ready') else 'bi-circle' }}"></i> {{ 'Pronto' if p.get('ready') else 'Aguardando' }}</span>
+              <code>{{ p.get('steam_id64') or p.get('steam','?') }}</code>
+              <span>{{ p.get('ping','?') }}{% if p.get('ping') != '?' %} ms{% endif %}</span>
               <form class="js-async-form" data-confirm="Remover {{ p.get('name','este jogador') }} do servidor?" method="post" action="{{ url_for('admin.server_kick',code=server.code) }}"><input type="hidden" name="userid" value="{{ p.get('userid') }}"><button class="icon-button danger" title="Expulsar jogador"><i class="bi bi-person-x"></i></button></form>
             </div>
           {% else %}

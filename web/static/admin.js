@@ -69,17 +69,33 @@
       return;
     }
 
-    body.innerHTML = players.map(player => `
+    body.innerHTML = players.map(player => {
+      const registered = Boolean(player.registered);
+      const teams = Array.isArray(player.platform_teams) ? player.platform_teams : [];
+      const teamTag = teams[0]?.tag ? ` · ${escapeHtml(teams[0].tag)}` : '';
+      const account = registered
+        ? `<span class="account-pill registered"><i class="bi bi-patch-check-fill"></i> PLAY4LAN</span>${teamTag}`
+        : '<span class="account-pill guest">Não cadastrado</span>';
+      const avatar = player.avatar_url
+        ? `<img src="${escapeHtml(player.avatar_url)}" alt="">`
+        : '<span class="player-avatar-fallback"><i class="bi bi-person-fill"></i></span>';
+      const side = escapeHtml(player.team || 'SPEC');
+      const ready = Boolean(player.ready);
+      const ping = player.ping === '?' || player.ping == null ? '?' : `${escapeHtml(player.ping)} ms`;
+      return `
       <div class="player-row" data-player-userid="${escapeHtml(player.userid)}">
         <span class="userid">#${escapeHtml(player.userid ?? '?')}</span>
-        <strong><span class="player-presence"></span>${escapeHtml(player.name || '?')}</strong>
-        <code>${escapeHtml(player.steam || '?')}</code>
-        <span>${escapeHtml(player.ping ?? '?')} ms</span>
+        <div class="player-identity">${avatar}<div><strong><span class="player-presence"></span>${escapeHtml(player.name || '?')}</strong><small>${account}</small></div></div>
+        <span class="side-pill ${String(player.team || 'SPEC').toLowerCase()}">${side}</span>
+        <span class="ready-pill ${ready ? 'yes' : 'no'}"><i class="bi ${ready ? 'bi-check-circle-fill' : 'bi-circle'}"></i> ${ready ? 'Pronto' : 'Aguardando'}</span>
+        <code>${escapeHtml(player.steam_id64 || player.steam || '?')}</code>
+        <span>${ping}</span>
         <form class="js-async-form" data-confirm="Remover ${escapeHtml(player.name || 'este jogador')} do servidor?" method="post" action="/admin/servers/${encodeURIComponent(currentServer)}/kick">
           <input type="hidden" name="userid" value="${escapeHtml(player.userid)}">
           <button class="icon-button danger" title="Expulsar jogador"><i class="bi bi-person-x"></i></button>
         </form>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   function updateServerDetail(data) {
