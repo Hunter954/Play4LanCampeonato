@@ -1,0 +1,10 @@
+{% extends 'site_base.html' %}
+{% from '_ui.html' import tournament_card %}
+{% block title %}Campeonatos · PLAY4LAN{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="kicker">Competições</span><h1>Campeonatos</h1><p class="muted">Campeonatos presenciais de CS2 com servidores dedicados.</p></div></div>
+<div class="t-grid">
+  {% for t in tournaments %}{{ tournament_card(t) }}
+  {% else %}<div class="empty"><i class="bi bi-trophy"></i><b>Nenhum campeonato publicado ainda</b><span>Monte seu time agora para estar pronto quando as inscrições abrirem.</span></div>{% endfor %}
+</div>
+{% endblock %}

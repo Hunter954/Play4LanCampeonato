@@ -1,0 +1,29 @@
+{% extends 'site_base.html' %}
+{% from '_ui.html' import avatar, team_logo %}
+{% block title %}Convite{{ ' · ' ~ team.name if team }} · PLAY4LAN{% endblock %}
+{% block content %}
+{% if not team %}
+<div class="auth-card"><span class="logo-mark big"><i class="bi bi-link-45deg"></i></span><h1>Convite inválido</h1><p class="muted">Esse link expirou ou foi trocado pelo capitão. Peça um link novo.</p><a class="btn btn-primary btn-block" href="/teams/">Ver times</a></div>
+{% else %}
+<div class="auth-card wide">
+  {{ team_logo(team, 'xl') }}
+  <span class="kicker">Convite para jogar</span>
+  <h1>{{ team.name }} <small class="muted">[{{ team.tag }}]</small></h1>
+  <p class="muted">Capitão: <b>{{ team.owner.display_name }}</b> · {{ team.members|length }}/{{ roster_size }} jogadores</p>
+  <div class="avatar-stack big">{% for m in team.roster %}{{ avatar(m.user, 'md') }}{% endfor %}{% for _ in range(roster_size - team.members|length) %}<span class="avatar avatar-md avatar-slot"></span>{% endfor %}</div>
+  {% if already %}
+    <p class="ok-text"><i class="bi bi-check-circle-fill"></i> Você já faz parte deste time.</p>
+    <a class="btn btn-primary btn-block" href="/teams/{{ team.id }}">Ir para o time</a>
+  {% elif team.is_full %}
+    <p class="bad-text"><i class="bi bi-x-circle-fill"></i> Este time já está completo.</p>
+  {% elif not current_user.is_authenticated %}
+    <a class="btn btn-steam btn-lg btn-block" href="/auth/steam?next={{ request.path|urlencode }}"><i class="bi bi-steam"></i> Entrar com Steam para aceitar</a>
+  {% elif not current_user.is_onboarded %}
+    <a class="btn btn-primary btn-lg btn-block" href="/auth/profile?next={{ request.path|urlencode }}"><i class="bi bi-person-vcard"></i> Completar cadastro para aceitar</a>
+    <p class="muted small">Leva menos de um minuto. Depois você volta direto para este convite.</p>
+  {% else %}
+    <form method="post" action="/teams/invite/{{ inv.token }}/accept"><button class="btn btn-primary btn-lg btn-block" type="submit"><i class="bi bi-person-plus-fill"></i> Aceitar convite</button></form>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

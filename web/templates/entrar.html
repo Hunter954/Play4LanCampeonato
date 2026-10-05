@@ -1,0 +1,16 @@
+{% extends 'site_base.html' %}
+{% block title %}Entrar · PLAY4LAN{% endblock %}
+{% block content %}
+<div class="auth-card">
+  <span class="logo-mark big">P4</span>
+  <h1>Entre na PLAY4LAN</h1>
+  <p class="muted">Use sua conta Steam. Não pedimos sua senha: o login acontece no site da própria Steam.</p>
+  <a class="btn btn-steam btn-lg btn-block" href="/auth/steam{{ '?next=' ~ (next|urlencode) if next }}"><i class="bi bi-steam"></i> Entrar com Steam</a>
+  <ul class="check-list">
+    <li><i class="bi bi-check2"></i> Crie seu time e convide os amigos</li>
+    <li><i class="bi bi-check2"></i> Inscreva-se nos campeonatos presenciais</li>
+    <li><i class="bi bi-check2"></i> Seu SteamID é reconhecido no servidor da LAN</li>
+  </ul>
+  <a class="tiny-link" href="/auth/login"><i class="bi bi-shield-lock"></i> Acesso da organização</a>
+</div>
+{% endblock %}

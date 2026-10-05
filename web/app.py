@@ -7,6 +7,29 @@ from web.extensions import db, login_manager, socketio
 
 load_dotenv()
 
+# create_all() não altera tabelas existentes; colunas novas entram aqui.
+ADDED_COLUMNS = {
+    'user': {'whatsapp': 'VARCHAR(32)', 'city': 'VARCHAR(80)', 'bio': 'VARCHAR(280)', 'onboarded_at': 'TIMESTAMP', 'last_login_at': 'TIMESTAMP'},
+    'team': {'description': 'VARCHAR(280)'},
+}
+
+STATUS_LABELS = {
+    'REGISTRATION': 'Inscrições abertas', 'CHECKIN': 'Check-in', 'RUNNING': 'Em andamento', 'LIVE': 'Ao vivo', 'FINISHED': 'Finalizado', 'CANCELLED': 'Cancelado',
+    'SCHEDULED': 'Agendada', 'PENDING': 'Aguardando aprovação', 'APPROVED': 'Confirmado', 'REJECTED': 'Recusado',
+    'DOUBLE_ELIMINATION': 'Dupla eliminação', 'SINGLE_ELIMINATION': 'Eliminação simples', 'SWISS': 'Suíço', 'ROUND_ROBIN': 'Pontos corridos',
+}
+
+def _ensure_columns():
+    from sqlalchemy import inspect, text
+    insp = inspect(db.engine)
+    for table, cols in ADDED_COLUMNS.items():
+        if not insp.has_table(table): continue
+        existing = {c['name'] for c in insp.get_columns(table)}
+        for name, ddl in cols.items():
+            if name not in existing:
+                db.session.execute(text(f'ALTER TABLE "{table}" ADD COLUMN {name} {ddl}'))
+    db.session.commit()
+
 def create_app():
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev")
@@ -18,7 +41,17 @@ def create_app():
     app.config["SQLALCHEMY_DATABASE_URI"] = db_url
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_CONTENT_LENGTH_MB", "1024")) * 1024 * 1024
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"; app.config["REMEMBER_COOKIE_SAMESITE"] = "Lax"
     db.init_app(app); login_manager.init_app(app); socketio.init_app(app)
+
+    @app.template_filter('label')
+    def label_filter(value): return STATUS_LABELS.get(str(value or '').upper(), str(value or '').replace('_', ' ').title())
+
+    @app.errorhandler(404)
+    def not_found(e):
+        from flask import request, render_template
+        if request.path.startswith(('/api', '/admin', '/static')): return e
+        return render_template('errors/404.html'), 404
 
     from web.models import User
     @login_manager.user_loader
@@ -34,7 +67,7 @@ def create_app():
     app.register_blueprint(tournaments_bp); app.register_blueprint(admin_bp); app.register_blueprint(api_bp)
 
     with app.app_context():
-        db.create_all()
+        db.create_all(); _ensure_columns()
         email=os.getenv("ADMIN_EMAIL"); pwd=os.getenv("ADMIN_PASSWORD")
         if email and pwd and not User.query.filter_by(email=email).first():
             db.session.add(User(email=email, password_hash=generate_password_hash(pwd), is_admin=True, nickname="ADMIN")); db.session.commit()

@@ -1,1 +1,62 @@
-{% extends 'base.html' %}{% block content %}<section class="hero"><p class="eyebrow">PLATAFORMA DE CAMPEONATO</p><h1>CS2 presencial.<br>Gestão profissional.</h1><p>Times, inscrições, brackets, partidas, demos e servidores em um único sistema.</p></section><h2>Campeonatos</h2><div class="grid">{% for t in tournaments %}<a class="card" href="/tournaments/{{t.id}}"><span>{{t.status}}</span><h3>{{t.name}}</h3><p>{{t.max_teams}} times · {{t.format}}</p></a>{% else %}<div class="card">Nenhum campeonato criado.</div>{% endfor %}</div><h2>Partidas</h2><div class="grid">{% for m in matches %}<div class="card"><span>{{m.status}}</span><h3>{{m.team1.name if m.team1 else 'TBD'}} {{m.team1_score}} × {{m.team2_score}} {{m.team2.name if m.team2 else 'TBD'}}</h3><p>{{m.current_map or 'Mapa a definir'}}</p></div>{% endfor %}</div>{% endblock %}
+{% extends 'site_base.html' %}
+{% from '_ui.html' import tournament_card, match_row, team_logo %}
+{% block main_class %}home{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="wrap hero-inner">
+    <div class="hero-copy">
+      <span class="kicker"><i class="bi bi-broadcast"></i> Counter-Strike 2 · Presencial</span>
+      <h1>Monte seu time.<br><span class="hl">Jogue na LAN.</span></h1>
+      <p>Entre com a Steam, reúna seus 5 jogadores e garanta a vaga nos campeonatos da PLAY4LAN. Partidas em servidores dedicados, com demos e placar ao vivo.</p>
+      <div class="hero-cta">
+        {% if current_user.is_authenticated %}
+          <a class="btn btn-primary btn-lg" href="/conta"><i class="bi bi-speedometer2"></i> Minha conta</a>
+          <a class="btn btn-ghost btn-lg" href="/tournaments/"><i class="bi bi-trophy"></i> Ver campeonatos</a>
+        {% else %}
+          <a class="btn btn-steam btn-lg" href="/auth/steam"><i class="bi bi-steam"></i> Entrar com Steam</a>
+          <a class="btn btn-ghost btn-lg" href="/tournaments/"><i class="bi bi-trophy"></i> Ver campeonatos</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="hero-stats">
+      <div><b>{{ stats.players }}</b><span>Jogadores</span></div>
+      <div><b>{{ stats.teams }}</b><span>Times</span></div>
+      <div><b>{{ stats.tournaments }}</b><span>Campeonatos</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap page">
+  <section class="section">
+    <div class="section-head"><div><span class="kicker">Inscrições</span><h2>Campeonatos</h2></div><a class="link-more" href="/tournaments/">Ver todos <i class="bi bi-arrow-right"></i></a></div>
+    <div class="t-grid">
+      {% for t in tournaments %}{{ tournament_card(t) }}
+      {% else %}<div class="empty"><i class="bi bi-trophy"></i><b>Nenhum campeonato publicado ainda</b><span>Monte seu time agora para estar pronto quando as inscrições abrirem.</span></div>{% endfor %}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div><span class="kicker">Como funciona</span><h2>Do login à partida em 4 passos</h2></div></div>
+    <ol class="how">
+      <li><i class="bi bi-steam"></i><b>Entre com a Steam</b><span>Sem senha nova: usamos sua conta Steam para identificar você no servidor.</span></li>
+      <li><i class="bi bi-person-vcard"></i><b>Complete o cadastro</b><span>Nick, nome e WhatsApp para a organização falar com você no dia.</span></li>
+      <li><i class="bi bi-people-fill"></i><b>Monte o time</b><span>Crie o time e mande o link de convite para os outros 4 jogadores.</span></li>
+      <li><i class="bi bi-trophy-fill"></i><b>Inscreva-se</b><span>O capitão inscreve o time e a organização confirma a vaga.</span></li>
+    </ol>
+  </section>
+
+  {% if matches %}
+  <section class="section">
+    <div class="section-head"><div><span class="kicker">Resultados</span><h2>Últimas partidas</h2></div></div>
+    <div class="panel flush">{% for m in matches %}{{ match_row(m) }}{% endfor %}</div>
+  </section>
+  {% endif %}
+
+  {% if recent_teams %}
+  <section class="section">
+    <div class="section-head"><div><span class="kicker">Comunidade</span><h2>Times recentes</h2></div><a class="link-more" href="/teams/">Todos os times <i class="bi bi-arrow-right"></i></a></div>
+    <div class="team-strip">{% for t in recent_teams %}<a class="team-pill" href="/teams/{{ t.id }}">{{ team_logo(t, 'sm') }}<span><b>{{ t.name }}</b><small>{{ t.tag }} · {{ t.members|length }}/5</small></span></a>{% endfor %}</div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

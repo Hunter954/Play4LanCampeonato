@@ -1,1 +1,95 @@
-{% extends 'base.html' %}{% block content %}<div class="team-head">{% if team.logo_url %}<img class="team-logo" src="{{team.logo_url}}">{% endif %}<div><p class="eyebrow">{{team.tag}}</p><h1>{{team.name}}</h1><p>{{team.members|length}}/5 jogadores</p></div></div><div class="panel"><h2>Elenco</h2>{% for m in team.members %}<div class="member"><span>{{m.user.nickname or m.user.steam_name or m.user.steam_id64}}</span><b>{{m.role}}</b>{% if can_manage and m.user_id != team.owner_id %}<form method="post" action="/teams/{{team.id}}/remove/{{m.user_id}}"><button class="danger">Remover</button></form>{% endif %}</div>{% endfor %}</div>{% if can_manage %}<div class="panel"><h2>Convidar jogador</h2><form method="post" action="/teams/{{team.id}}/invite"><button>Gerar novo link</button></form>{% for i in invites %}<p><code>{{ request.host_url.rstrip('/') }}/teams/invite/{{i.token}}</code></p>{% else %}<p>Nenhum convite ativo.</p>{% endfor %}</div>{% endif %}{% endblock %}
+{% extends 'site_base.html' %}
+{% from '_ui.html' import avatar, team_logo, badge, match_row %}
+{% block title %}{{ team.name }} · PLAY4LAN{% endblock %}
+{% block content %}
+<section class="team-banner">
+  {{ team_logo(team, 'xl') }}
+  <div class="team-banner-id">
+    <span class="kicker">{{ team.tag }}</span>
+    <h1>{{ team.name }}</h1>
+    {% if team.description %}<p>{{ team.description }}</p>{% endif %}
+    <div class="team-facts">
+      <span><i class="bi bi-people-fill"></i> {{ team.members|length }}/{{ roster_size }} jogadores</span>
+      <span><i class="bi bi-star-fill"></i> Capitão: <a href="/jogadores/{{ team.owner_id }}">{{ team.owner.display_name }}</a></span>
+      {% if team.is_full %}<span class="ok"><i class="bi bi-check-circle-fill"></i> Elenco completo</span>{% endif %}
+    </div>
+  </div>
+  <div class="team-banner-actions">
+    {% if can_manage %}<a class="btn btn-ghost" href="/teams/{{ team.id }}/edit"><i class="bi bi-gear"></i> Editar time</a>{% endif %}
+    {% if is_member and team.owner_id != current_user.id %}<form method="post" action="/teams/{{ team.id }}/leave" data-confirm="Sair do time {{ team.name }}?"><button class="btn btn-ghost" type="submit"><i class="bi bi-box-arrow-left"></i> Sair do time</button></form>{% endif %}
+  </div>
+</section>
+
+<div class="team-layout">
+  <div>
+    <section class="section tight">
+      <div class="section-head"><h2>Elenco</h2></div>
+      <div class="roster">
+        {% for m in team.roster %}
+        <div class="player-card {{ 'captain' if m.user_id == team.owner_id }}">
+          {% if m.user_id == team.owner_id %}<span class="crown" title="Capitão"><i class="bi bi-star-fill"></i></span>{% endif %}
+          <a href="/jogadores/{{ m.user_id }}">{{ avatar(m.user, 'lg') }}</a>
+          <a class="player-name" href="/jogadores/{{ m.user_id }}">{{ m.user.display_name }}</a>
+          <small>{{ 'Capitão' if m.user_id == team.owner_id else 'Jogador' }}</small>
+          {% if not m.user.is_onboarded %}<span class="warn-pill" title="Esse jogador precisa completar o cadastro"><i class="bi bi-exclamation-triangle-fill"></i> Cadastro pendente</span>{% endif %}
+          {% if can_manage and m.user_id != team.owner_id %}
+          <div class="player-actions">
+            <form method="post" action="/teams/{{ team.id }}/captain/{{ m.user_id }}" data-confirm="Passar a capitania para {{ m.user.display_name }}? Você deixará de gerenciar o time."><button class="icon-btn" title="Tornar capitão"><i class="bi bi-star"></i></button></form>
+            <form method="post" action="/teams/{{ team.id }}/remove/{{ m.user_id }}" data-confirm="Remover {{ m.user.display_name }} do time?"><button class="icon-btn danger" title="Remover do time"><i class="bi bi-person-x"></i></button></form>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+        {% for _ in range(roster_size - team.members|length) %}
+        <div class="player-card slot"><span class="avatar avatar-lg avatar-slot"><i class="bi bi-plus-lg"></i></span><span class="player-name">Vaga aberta</span><small>{{ 'Envie o link de convite' if can_manage else 'Aguardando jogador' }}</small></div>
+        {% endfor %}
+      </div>
+    </section>
+
+    {% if matches %}
+    <section class="section tight">
+      <div class="section-head"><h2>Partidas</h2></div>
+      <div class="panel flush">{% for m in matches %}{{ match_row(m) }}{% endfor %}</div>
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="team-side">
+    {% if can_manage %}
+    <section class="panel">
+      <div class="panel-head"><h3><i class="bi bi-link-45deg"></i> Convidar jogadores</h3></div>
+      {% if team.is_full %}
+        <p class="muted small">O elenco está completo. Remova alguém para liberar vaga.</p>
+      {% elif invite %}
+        <p class="muted small">Mande este link para quem vai jogar com você. A pessoa entra com a Steam e aceita o convite.</p>
+        {% set link = request.host_url.rstrip('/') ~ '/teams/invite/' ~ invite.token %}
+        <div class="copy-box"><input readonly value="{{ link }}" data-copy-source><button class="btn btn-primary btn-sm" type="button" data-copy><i class="bi bi-clipboard"></i> Copiar</button></div>
+        <a class="btn btn-whats btn-sm btn-block" target="_blank" rel="noopener" href="https://wa.me/?text={{ ('Entra no meu time ' ~ team.name ~ ' na PLAY4LAN: ' ~ link)|urlencode }}"><i class="bi bi-whatsapp"></i> Enviar no WhatsApp</a>
+      {% endif %}
+      {% if not team.is_full %}
+      <form method="post" action="/teams/{{ team.id }}/invite" {% if invite %}data-confirm="Gerar um novo link? O link atual vai parar de funcionar."{% endif %}><button class="btn btn-ghost btn-sm btn-block" type="submit"><i class="bi bi-arrow-repeat"></i> {{ 'Gerar novo link' if invite else 'Gerar link de convite' }}</button></form>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    <section class="panel">
+      <div class="panel-head"><h3><i class="bi bi-trophy"></i> Campeonatos</h3></div>
+      {% for r in regs %}
+      <a class="list-row" href="/tournaments/{{ r.tournament_id }}"><div><b>{{ r.tournament.name }}</b><small>Inscrito em {{ r.created_at.strftime('%d/%m/%Y') if r.created_at }}</small></div>{{ badge(r.status) }}</a>
+      {% else %}<p class="muted small">Nenhuma inscrição ainda.</p>{% endfor %}
+    </section>
+
+    {% if can_manage %}
+    <section class="panel danger-zone">
+      <h3>Zona de perigo</h3>
+      {% if regs|rejectattr('status', 'equalto', 'REJECTED')|list or matches %}
+      <p class="muted small">O time tem inscrição ou partida em campeonato e não pode ser excluído. Fale com a organização.</p>
+      {% else %}
+      <p class="muted small">Excluir o time remove o elenco e os convites. Não dá para desfazer.</p>
+      <form method="post" action="/teams/{{ team.id }}/delete" data-confirm="Excluir o time {{ team.name }} definitivamente?"><button class="btn btn-danger btn-sm btn-block" type="submit"><i class="bi bi-trash3"></i> Excluir time</button></form>
+      {% endif %}
+    </section>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

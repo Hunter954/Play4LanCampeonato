@@ -1,0 +1,25 @@
+{% extends 'site_base.html' %}
+{% from '_ui.html' import avatar, team_logo %}
+{% block title %}{{ player.display_name }} · PLAY4LAN{% endblock %}
+{% block content %}
+<section class="profile-head">
+  {{ avatar(player, 'xl') }}
+  <div class="profile-id">
+    <span class="kicker">Jogador</span>
+    <h1>{{ player.display_name }}</h1>
+    <p class="muted">{% if player.city %}<i class="bi bi-geo-alt"></i> {{ player.city }} · {% endif %}Na PLAY4LAN desde {{ player.created_at.strftime('%m/%Y') if player.created_at else '—' }}</p>
+  </div>
+  <div class="profile-actions">
+    <a class="btn btn-ghost" href="{{ player.steam_profile_url or 'https://steamcommunity.com/profiles/' ~ player.steam_id64 }}" target="_blank" rel="noopener"><i class="bi bi-steam"></i> Perfil Steam</a>
+  </div>
+</section>
+{% if player.bio %}<div class="panel bio">{{ player.bio }}</div>{% endif %}
+<section class="section">
+  <div class="section-head"><div><span class="kicker">Times</span><h2>Onde joga</h2></div></div>
+  <div class="team-grid">
+    {% for t in teams %}
+    <a class="team-card" href="/teams/{{ t.id }}">{{ team_logo(t, 'md') }}<div><b>{{ t.name }}</b><small>{{ t.tag }} · {{ 'Capitão' if t.owner_id == player.id else 'Jogador' }}</small></div></a>
+    {% else %}<div class="empty small"><i class="bi bi-people"></i><b>Sem time no momento</b></div>{% endfor %}
+  </div>
+</section>
+{% endblock %}

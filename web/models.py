@@ -12,12 +12,32 @@ class User(UserMixin, db.Model):
     steam_name=db.Column(db.String(255)); steam_avatar=db.Column(db.String(500)); steam_profile_url=db.Column(db.String(500))
     real_name=db.Column(db.String(255)); nickname=db.Column(db.String(80)); avatar_url=db.Column(db.String(500))
     is_admin=db.Column(db.Boolean, default=False); created_at=db.Column(db.DateTime, default=now)
+    whatsapp=db.Column(db.String(32)); city=db.Column(db.String(80)); bio=db.Column(db.String(280))
+    onboarded_at=db.Column(db.DateTime); last_login_at=db.Column(db.DateTime)
+
+    @property
+    def display_name(self): return self.nickname or self.steam_name or (f'Jogador {self.steam_id64[-4:]}' if self.steam_id64 else 'Jogador')
+    @property
+    def avatar(self): return self.avatar_url or self.steam_avatar
+    @property
+    def is_onboarded(self): return bool(self.onboarded_at and self.nickname and self.real_name)
+    @property
+    def memberships(self): return TeamMember.query.filter_by(user_id=self.id).order_by(TeamMember.joined_at).all()
+
+ROSTER_SIZE = 5
 
 class Team(db.Model):
     id=db.Column(db.Integer, primary_key=True); name=db.Column(db.String(120), nullable=False); tag=db.Column(db.String(24), nullable=False)
     logo_url=db.Column(db.String(500)); owner_id=db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False); created_at=db.Column(db.DateTime, default=now)
+    description=db.Column(db.String(280))
     owner=db.relationship('User', foreign_keys=[owner_id])
     members=db.relationship('TeamMember', cascade='all, delete-orphan', backref='team')
+
+    @property
+    def is_full(self): return len(self.members) >= ROSTER_SIZE
+    @property
+    def roster(self): return sorted(self.members, key=lambda m: (m.user_id != self.owner_id, m.joined_at or now()))
+    def has_member(self, user): return bool(user and getattr(user, 'id', None) and any(m.user_id == user.id for m in self.members))
 
 class TeamMember(db.Model):
     id=db.Column(db.Integer, primary_key=True); team_id=db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
@@ -34,6 +54,15 @@ class Tournament(db.Model):
     id=db.Column(db.Integer, primary_key=True); name=db.Column(db.String(160), nullable=False); description=db.Column(db.Text)
     status=db.Column(db.String(30), default='REGISTRATION'); max_teams=db.Column(db.Integer, default=16); format=db.Column(db.String(30), default='DOUBLE_ELIMINATION')
     map_pool=db.Column(db.Text, default='Mirage,Inferno,Nuke,Ancient,Anubis,Dust II,Train'); created_at=db.Column(db.DateTime, default=now)
+
+    @property
+    def maps(self): return [m.strip() for m in (self.map_pool or '').split(',') if m.strip()]
+    @property
+    def approved_count(self): return TournamentRegistration.query.filter_by(tournament_id=self.id, status='APPROVED').count()
+    @property
+    def registration_count(self): return TournamentRegistration.query.filter(TournamentRegistration.tournament_id==self.id, TournamentRegistration.status!='REJECTED').count()
+    @property
+    def is_open(self): return self.status == 'REGISTRATION'
 
 class TournamentRegistration(db.Model):
     id=db.Column(db.Integer, primary_key=True); tournament_id=db.Column(db.Integer, db.ForeignKey('tournament.id'), nullable=False)

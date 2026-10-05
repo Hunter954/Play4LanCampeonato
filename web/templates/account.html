@@ -1,0 +1,63 @@
+{% extends 'site_base.html' %}
+{% from '_ui.html' import avatar, team_logo, badge, tournament_card %}
+{% block title %}Minha conta · PLAY4LAN{% endblock %}
+{% block content %}
+<section class="profile-head">
+  {{ avatar(current_user, 'xl') }}
+  <div class="profile-id">
+    <span class="kicker">Minha conta</span>
+    <h1>{{ current_user.display_name }}</h1>
+    <p class="muted">{% if current_user.real_name %}{{ current_user.real_name }} · {% endif %}{% if current_user.steam_id64 %}<span class="mono">{{ current_user.steam_id64 }}</span>{% endif %}</p>
+  </div>
+  <div class="profile-actions">
+    <a class="btn btn-ghost" href="/auth/profile"><i class="bi bi-pencil-square"></i> Editar cadastro</a>
+    {% if current_user.steam_id64 %}<a class="btn btn-ghost" href="/jogadores/{{ current_user.id }}"><i class="bi bi-person-badge"></i> Perfil público</a>{% endif %}
+  </div>
+</section>
+
+<div class="account-grid">
+  <section class="panel">
+    {% set done = steps|selectattr('done')|list|length %}
+    <div class="panel-head"><h2>Sua jornada</h2><span class="muted">{{ done }}/{{ steps|length }} concluídos</span></div>
+    <div class="slots-bar big"><span style="width: {{ (done * 100 / steps|length)|round }}%"></span></div>
+    {% if done == steps|length %}<p class="all-done"><i class="bi bi-check-circle-fill"></i> Tudo pronto! Agora é aguardar a confirmação e a tabela do campeonato.</p>{% endif %}
+    <ol class="steps">
+      {% set ns = namespace(next_found=false) %}
+      {% for s in steps %}
+      {% set is_next = not s.done and not ns.next_found %}{% if is_next %}{% set ns.next_found = true %}{% endif %}
+      <li class="{{ 'done' if s.done }} {{ 'next' if is_next }}">
+        <span class="step-dot">{% if s.done %}<i class="bi bi-check-lg"></i>{% else %}{{ loop.index }}{% endif %}</span>
+        <div><b>{{ s.title }}</b><small>{{ s.text }}</small></div>
+        {% if is_next and s.url %}<a class="btn btn-primary btn-sm" href="{{ s.url }}">{{ s.cta }} <i class="bi bi-arrow-right"></i></a>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Meus times</h2>{% if current_user.is_onboarded %}<a class="btn btn-ghost btn-sm" href="/teams/create"><i class="bi bi-plus-lg"></i> Criar time</a>{% endif %}</div>
+    {% for t in teams %}
+    <a class="list-row" href="/teams/{{ t.id }}">
+      {{ team_logo(t, 'sm') }}
+      <div><b>{{ t.name }}</b><small>{{ t.tag }} · {{ 'Capitão' if t.owner_id == current_user.id else 'Jogador' }}</small></div>
+      <span class="roster-count {{ 'full' if t.members|length >= roster_size }}">{{ t.members|length }}/{{ roster_size }}</span>
+    </a>
+    {% else %}
+    <div class="empty small"><i class="bi bi-people"></i><b>Você ainda não está em nenhum time</b><span>Crie um time ou peça ao seu capitão o link de convite.</span></div>
+    {% endfor %}
+    {% if regs %}
+    <h3 class="sub">Inscrições</h3>
+    {% for r in regs %}
+    <a class="list-row" href="/tournaments/{{ r.tournament_id }}"><span class="icon-box"><i class="bi bi-trophy"></i></span><div><b>{{ r.tournament.name }}</b><small>{{ r.team.name }}</small></div>{{ badge(r.status) }}</a>
+    {% endfor %}
+    {% endif %}
+  </section>
+</div>
+
+{% if open_tournaments %}
+<section class="section">
+  <div class="section-head"><div><span class="kicker">Inscrições abertas</span><h2>Campeonatos</h2></div></div>
+  <div class="t-grid">{% for t in open_tournaments %}{{ tournament_card(t) }}{% endfor %}</div>
+</section>
+{% endif %}
+{% endblock %}

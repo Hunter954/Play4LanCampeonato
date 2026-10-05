@@ -4,7 +4,9 @@ from flask_socketio import SocketIO
 
 db = SQLAlchemy()
 login_manager = LoginManager()
-login_manager.login_view = "auth.login"
+login_manager.login_view = "auth.entrar"
+login_manager.login_message = "Entre com sua Steam para continuar."
+login_manager.login_message_category = "info"
 
 try:
     import gevent  # noqa: F401

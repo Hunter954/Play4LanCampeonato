@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b0e14">
+  <title>{% block title %}PLAY4LAN · Campeonatos de CS2{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Rajdhani:wght@600;700&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='site.css') }}">
+  <script src="{{ url_for('static', filename='site.js') }}" defer></script>
+</head>
+{% from '_ui.html' import avatar %}
+{% set path = request.path %}
+<body class="site">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="logo" href="/"><span class="logo-mark">P4</span><span class="logo-text">PLAY<b>4</b>LAN</span></a>
+      <button class="nav-toggle" type="button" data-nav-toggle aria-label="Abrir menu"><i class="bi bi-list"></i></button>
+      <nav class="mainnav" data-nav>
+        <a href="/" class="{{ 'active' if path == '/' }}"><i class="bi bi-house-door"></i> Início</a>
+        <a href="/tournaments/" class="{{ 'active' if path.startswith('/tournaments') }}"><i class="bi bi-trophy"></i> Campeonatos</a>
+        <a href="/teams/" class="{{ 'active' if path.startswith('/teams') }}"><i class="bi bi-people"></i> Times</a>
+        <div class="nav-user">
+        {% if current_user.is_authenticated %}
+          <div class="user-menu" data-dropdown>
+            <button type="button" class="user-chip" data-dropdown-toggle>
+              {{ avatar(current_user, 'sm') }}<span>{{ current_user.display_name }}</span><i class="bi bi-chevron-down"></i>
+            </button>
+            <div class="dropdown">
+              <a href="/conta"><i class="bi bi-speedometer2"></i> Minha conta</a>
+              {% if current_user.steam_id64 %}<a href="/jogadores/{{ current_user.id }}"><i class="bi bi-person-badge"></i> Meu perfil público</a>{% endif %}
+              <a href="/auth/profile"><i class="bi bi-pencil-square"></i> Editar cadastro</a>
+              {% if current_user.is_admin %}<a href="/admin/"><i class="bi bi-grid-1x2-fill"></i> Painel admin</a>{% endif %}
+              <hr><a href="/auth/logout" class="danger-link"><i class="bi bi-box-arrow-right"></i> Sair</a>
+            </div>
+          </div>
+        {% else %}
+          <a class="btn btn-steam" href="/auth/steam{{ '?next=' ~ (request.full_path.rstrip('?')|urlencode) if path not in ['/', '/auth/entrar'] }}"><i class="bi bi-steam"></i> Entrar com Steam</a>
+        {% endif %}
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  {% if current_user.is_authenticated and not current_user.is_onboarded and not path.startswith('/auth/profile') %}
+  <div class="notice-bar"><div class="wrap"><i class="bi bi-exclamation-circle-fill"></i> Seu cadastro está incompleto. Complete para criar ou entrar num time. <a href="/auth/profile">Completar agora <i class="bi bi-arrow-right"></i></a></div></div>
+  {% endif %}
+
+  <div class="flash-stack">
+  {% with messages = get_flashed_messages(with_categories=true) %}{% for cat, msg in messages %}
+    <div class="flash flash-{{ cat }}" data-flash><i class="bi {{ {'success':'bi-check-circle-fill','danger':'bi-x-octagon-fill'}.get(cat, 'bi-info-circle-fill') }}"></i><span>{{ msg }}</span><button type="button" data-flash-close aria-label="Fechar"><i class="bi bi-x"></i></button></div>
+  {% endfor %}{% endwith %}
+  </div>
+
+  <main class="{% block main_class %}wrap page{% endblock %}">{% block content %}{% endblock %}</main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <a class="logo" href="/"><span class="logo-mark">P4</span><span class="logo-text">PLAY<b>4</b>LAN</span></a>
+      <p>Campeonatos presenciais de Counter-Strike 2. Não afiliado à Valve.</p>
+      <nav><a href="/tournaments/">Campeonatos</a><a href="/teams/">Times</a>{% if not current_user.is_authenticated %}<a href="/auth/login">Acesso da organização</a>{% endif %}</nav>
+    </div>
+  </footer>
+</body>
+</html>

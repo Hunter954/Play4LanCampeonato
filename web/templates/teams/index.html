@@ -1,1 +1,27 @@
-{% extends 'base.html' %}{% block content %}<div class="title-row"><h1>Times</h1>{% if current_user.is_authenticated %}<a class="button" href="/teams/create">Criar time</a>{% endif %}</div><div class="grid">{% for t in teams %}<a class="card" href="/teams/{{t.id}}"><h3>{{t.name}}</h3><p>{{t.tag}} · {{t.members|length}} jogadores</p></a>{% endfor %}</div>{% endblock %}
+{% extends 'site_base.html' %}
+{% from '_ui.html' import avatar, team_logo %}
+{% block title %}Times · PLAY4LAN{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><span class="kicker">Comunidade</span><h1>Times</h1><p class="muted">{{ teams|length }} {{ 'time encontrado' if teams|length == 1 else 'times encontrados' }}{% if q %} para “{{ q }}”{% endif %}</p></div>
+  <div class="page-actions">
+    <form class="search" method="get" action="/teams/"><i class="bi bi-search"></i><input name="q" value="{{ q }}" placeholder="Buscar por nome ou tag"></form>
+    <a class="btn btn-primary" href="/teams/create"><i class="bi bi-plus-lg"></i> Criar time</a>
+  </div>
+</div>
+<div class="team-grid">
+  {% for t in teams %}
+  <a class="team-card" href="/teams/{{ t.id }}">
+    {{ team_logo(t, 'md') }}
+    <div class="team-card-body">
+      <b>{{ t.name }}</b>
+      <small>{{ t.tag }}</small>
+      <div class="avatar-stack">{% for m in t.roster %}{{ avatar(m.user, 'xs') }}{% endfor %}{% for _ in range(5 - t.members|length) %}<span class="avatar avatar-xs avatar-slot"></span>{% endfor %}</div>
+    </div>
+    <span class="roster-count {{ 'full' if t.is_full }}">{{ t.members|length }}/5</span>
+  </a>
+  {% else %}
+  <div class="empty"><i class="bi bi-people"></i><b>{{ 'Nenhum time encontrado' if q else 'Nenhum time criado ainda' }}</b><span>{{ 'Tente outro nome ou tag.' if q else 'Seja o primeiro: crie seu time e chame os amigos.' }}</span></div>
+  {% endfor %}
+</div>
+{% endblock %}
