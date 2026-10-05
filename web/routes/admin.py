@@ -22,9 +22,16 @@ MAPS = [
 
 def admin_only(fn):
     @wraps(fn)
-    @login_required
     def inner(*a, **k):
-        if not current_user.is_admin: abort(403)
+        if not current_user.is_authenticated:
+            return redirect(url_for('auth.login', next=request.full_path.rstrip('?') if request.method == 'GET' else None))
+        if not current_user.is_admin:
+            from web.routes.auth import admin_steam_ids
+            if current_user.steam_id64 and current_user.steam_id64 in admin_steam_ids():
+                current_user.is_admin = True; db.session.commit()
+            else:
+                if _is_ajax(): return jsonify(ok=False, error='Sua conta não tem acesso ao painel.'), 403
+                return render_template('errors/admin_forbidden.html'), 403
         return fn(*a, **k)
     return inner
 

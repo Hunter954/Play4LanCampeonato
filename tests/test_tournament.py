@@ -289,6 +289,24 @@ def test_toggle_admin_needs_pin(app):
     assert client_as(app, other).get('/admin/').status_code == 200
 
 
+def test_admin_access_flow(app, monkeypatch):
+    r = app.test_client().get('/admin/')
+    assert r.status_code == 302 and '/auth/login' in r.location
+    assert b'Entrar com Steam' in app.test_client().get('/auth/login?next=/admin/').data
+    u = user(); c = client_as(app, u)
+    r = c.get('/admin/'); assert r.status_code == 403 and u.steam_id64.encode() in r.data and b'ADMIN_STEAM_IDS' in r.data
+    monkeypatch.setenv('ADMIN_STEAM_IDS', f'123, {u.steam_id64}')
+    assert c.get('/admin/').status_code == 200 and db.session.get(User, u.id).is_admin
+    # login Steam de um SteamID listado também vira admin e vai direto ao painel
+    class Resp: text = 'is_valid:true'
+    monkeypatch.setattr('web.routes.auth.requests.post', lambda *a, **k: Resp())
+    monkeypatch.setenv('ADMIN_STEAM_IDS', '76561198099999999')
+    c2 = app.test_client()
+    with c2.session_transaction() as s: s['post_steam_next'] = '/admin/'
+    r = c2.get('/auth/steam/callback?openid.claimed_id=https://steamcommunity.com/openid/id/76561198099999999')
+    assert r.location.endswith('/admin/') and User.query.filter_by(steam_id64='76561198099999999').one().is_admin
+
+
 def test_agent_auto_update_rules():
     from agent.cs2 import CS2Process
     p = CS2Process({'exe': 'C:/x/runtime/server01/game/bin/win64/cs2.exe', 'args': []}, {'auto_update': True})

@@ -3,13 +3,14 @@
 {% block content %}
 <div class="auth-card">
   <span class="logo-mark big"><i class="bi bi-shield-lock"></i></span>
-  <h1>Acesso da organização</h1>
-  <p class="muted">Entre com o e-mail e a senha de administrador.</p>
-  <form method="post" class="form">
+  <h1>Painel da organização</h1>
+  <p class="muted">Entre com a sua Steam (se ela já for admin) ou com o e-mail e a senha de administrador.</p>
+  <a class="btn btn-steam btn-lg btn-block" href="/auth/steam{{ '?next=' ~ (next|urlencode) if next else '?next=%2Fadmin%2F' }}"><i class="bi bi-steam"></i> Entrar com Steam</a>
+  <div class="divider"><span>ou</span></div>
+  <form method="post" class="form" action="/auth/login{{ '?next=' ~ (next|urlencode) if next }}">
     <label class="field"><span>E-mail</span><input name="email" type="email" required autocomplete="username"></label>
     <label class="field"><span>Senha</span><input name="password" type="password" required autocomplete="current-password"></label>
-    <button class="btn btn-primary btn-lg btn-block" type="submit"><i class="bi bi-box-arrow-in-right"></i> Entrar</button>
+    <button class="btn btn-primary btn-lg btn-block" type="submit"><i class="bi bi-box-arrow-in-right"></i> Entrar com e-mail</button>
   </form>
-  <p class="muted small">Contas Steam marcadas como admin também acessam o painel pelo botão "Entrar com Steam".</p>
 </div>
 {% endblock %}

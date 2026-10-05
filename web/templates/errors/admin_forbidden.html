@@ -1,0 +1,20 @@
+{% extends 'site_base.html' %}
+{% block title %}Sem acesso ao painel · PLAY4LAN{% endblock %}
+{% block content %}
+<div class="auth-card wide">
+  <span class="logo-mark big"><i class="bi bi-shield-lock"></i></span>
+  <h1>Sua conta não é admin</h1>
+  <p class="muted">Você entrou como <b>{{ current_user.display_name }}</b>, mas essa conta ainda não tem acesso ao painel da organização.</p>
+  {% if current_user.steam_id64 %}
+  <div class="notice-box" style="text-align:left">
+    <i class="bi bi-steam"></i>
+    <div>Seu SteamID64: <b class="mono" style="user-select:all">{{ current_user.steam_id64 }}</b><br>
+    <small>Para liberar esta conta, peça a um admin para usar <b>Jogadores → Tornar admin</b>, ou coloque esse número na variável <b>ADMIN_STEAM_IDS</b> do Railway e recarregue esta página.</small></div>
+  </div>
+  {% endif %}
+  <div class="form-actions center" style="width:100%">
+    <a class="btn btn-ghost" href="/auth/logout">Sair e entrar com e-mail de admin</a>
+    <a class="btn btn-primary" href="/">Voltar ao site</a>
+  </div>
+</div>
+{% endblock %}

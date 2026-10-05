@@ -25,7 +25,12 @@ def onboarded_required(fn):
         return fn(*a, **k)
     return inner
 
+def admin_steam_ids():
+    """SteamID64 que viram admin automaticamente ao entrar (variável ADMIN_STEAM_IDS, separados por vírgula)."""
+    return {s.strip() for s in (os.getenv('ADMIN_STEAM_IDS') or '').replace(';', ',').split(',') if s.strip().isdigit()}
+
 def after_login_redirect(user, nxt=None):
+    if user.is_admin and nxt and nxt.startswith('/admin'): return redirect(nxt)
     if not user.is_onboarded: return redirect(url_for('auth.profile', next=nxt) if nxt else url_for('auth.profile'))
     return redirect(nxt or url_for('main.account'))
 
@@ -37,12 +42,13 @@ def entrar():
 
 @bp.route('/login',methods=['GET','POST'])
 def login():
+    nxt=safe_next(request.args.get('next'))
     if request.method=='POST':
-        u=User.query.filter_by(email=request.form.get('email')).first()
+        u=User.query.filter_by(email=(request.form.get('email') or '').strip().lower()).first() or User.query.filter_by(email=request.form.get('email')).first()
         if u and u.password_hash and check_password_hash(u.password_hash,request.form.get('password','')):
-            login_user(u); return redirect(safe_next(request.args.get('next')) or url_for('admin.dashboard') if u.is_admin else url_for('main.home'))
-        flash('Login inválido.','danger')
-    return render_template('login.html')
+            login_user(u); return redirect((nxt or url_for('admin.dashboard')) if u.is_admin else url_for('main.home'))
+        flash('E-mail ou senha incorretos.','danger')
+    return render_template('login.html', next=nxt)
 
 @bp.get('/logout')
 def logout(): logout_user(); flash('Você saiu da sua conta.','info'); return redirect(url_for('main.home'))
@@ -75,6 +81,7 @@ def steam_callback():
     if not m: flash('SteamID inválido.','danger'); return redirect(url_for('auth.entrar'))
     sid=m.group(1); u=User.query.filter_by(steam_id64=sid).first()
     if not u: u=User(steam_id64=sid); db.session.add(u)
+    if sid in admin_steam_ids(): u.is_admin=True
     refresh_steam_profile(u)
     u.steam_profile_url=u.steam_profile_url or f'https://steamcommunity.com/profiles/{sid}'
     u.last_login_at=datetime.utcnow()
