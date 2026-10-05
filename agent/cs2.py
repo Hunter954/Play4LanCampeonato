@@ -1,9 +1,12 @@
 import json
+import pathlib
 import re
 import socket
 import subprocess
+import threading
 import time
 
+from agent import updater
 from agent.rcon import RCONClient, RCONError
 
 
@@ -189,9 +192,77 @@ def merge_player_sources(structured, status_players):
 
 
 class CS2Process:
-    def __init__(self, cfg):
+    def __init__(self, cfg, global_cfg=None):
         self.cfg = cfg
         self.process = None
+        g = global_cfg or {}
+        exe = pathlib.Path(cfg.get('exe', ''))
+        # .../runtime/server01/game/bin/win64/cs2.exe -> .../runtime/server01
+        self.install_dir = cfg.get('install_dir') or (str(exe.parents[3]) if len(exe.parents) > 3 else '')
+        self.steamcmd = cfg.get('steamcmd') or g.get('steamcmd') or str(pathlib.Path(self.install_dir).parent / 'steamcmd' / 'steamcmd.exe')
+        self.auto_update = bool(cfg.get('auto_update', g.get('auto_update', False)))
+        self.version = {'installed': None, 'required': None, 'up_to_date': None, 'checked_at': None, 'error': None}
+        self.update = {'state': 'IDLE', 'message': '', 'started_at': None, 'finished_at': None, 'log': [], 'trigger': None}
+        self._last_check = 0.0
+
+    # ---------- versão e atualização ----------
+    def check_version(self, force=False):
+        if not force and time.time() - self._last_check < updater.CHECK_EVERY: return self.version
+        self._last_check = time.time()
+        installed = updater.installed_version(self.install_dir)
+        self.version.update({'installed': installed, 'checked_at': int(time.time())})
+        if not installed:
+            self.version['error'] = 'steam.inf não encontrado'; return self.version
+        try:
+            res = updater.check_valve(installed)
+            self.version.update({'up_to_date': res['up_to_date'], 'required': res['required'], 'error': None})
+        except Exception as exc:  # sem internet / Valve fora: mantém o último resultado
+            self.version['error'] = f'Falha ao consultar a Valve: {exc}'
+        return self.version
+
+    @property
+    def updating(self): return self.update['state'] == 'RUNNING'
+
+    def _log(self, line):
+        self.update['log'] = (self.update['log'] + [line])[-40:]
+        self.update['message'] = line[:200]
+
+    def start_update(self, trigger='manual'):
+        if self.updating: return {'ok': True, 'result': 'Atualização já em andamento.'}
+        if not pathlib.Path(self.steamcmd).exists():
+            return {'ok': False, 'error': f'SteamCMD não encontrado em {self.steamcmd}. Configure "steamcmd" no config.json.'}
+        self.update = {'state': 'RUNNING', 'message': 'Preparando atualização...', 'started_at': int(time.time()), 'finished_at': None, 'log': [], 'trigger': trigger}
+        threading.Thread(target=self._do_update, daemon=True).start()
+        return {'ok': True, 'result': 'Atualização iniciada. Acompanhe o progresso no painel.'}
+
+    def _do_update(self):
+        was_running = self._process_alive() or self._port_open()
+        try:
+            if was_running:
+                self._log('Desligando o servidor para atualizar...')
+                stopped = self.stop()
+                if not stopped.get('ok'): raise RuntimeError(stopped.get('error') or 'Não foi possível desligar o servidor.')
+            self._log('Rodando SteamCMD (app_update 730 validate)...')
+            if not updater.run_steamcmd(self.steamcmd, self.install_dir, self._log):
+                raise RuntimeError('SteamCMD terminou com erro. Veja o log.')
+            if updater.ensure_metamod(self.install_dir): self._log('gameinfo.gi corrigido: Metamod recolocado.')
+            self.check_version(force=True)
+            if was_running:
+                self._log('Ligando o servidor novamente...')
+                self.start()
+            self.update.update({'state': 'DONE', 'finished_at': int(time.time()),
+                                'message': f"Atualizado para {self.version.get('installed') or '?'}" + (' e religado.' if was_running else '.')})
+        except Exception as exc:
+            self.update.update({'state': 'FAILED', 'finished_at': int(time.time()), 'message': str(exc)[:200]})
+
+    def maybe_auto_update(self, player_count, busy):
+        """Atualiza sozinho quando a Valve exige e o servidor está vazio e sem partida."""
+        if not self.auto_update or self.updating or self.version.get('up_to_date') is not False: return False
+        if player_count or busy: return False
+        if self.update['state'] == 'FAILED' and time.time() - (self.update.get('finished_at') or 0) < 1800: return False
+        self.start_update('auto'); return True
+
+    def _process_alive(self): return bool(self.process and self.process.poll() is None)
 
     def _port_open(self):
         host = self.cfg.get('rcon_host', '127.0.0.1')
@@ -204,14 +275,18 @@ class CS2Process:
 
     @property
     def status(self):
-        if self.process and self.process.poll() is None:
-            return 'ONLINE'
-        # Se o Agent reiniciar enquanto o CS2 continuar aberto, não perdemos o
-        # estado do painel: o RCON/porta local confirma que o processo existe.
-        return 'ONLINE' if self._port_open() else 'OFFLINE'
+        if self.updating:
+            return 'UPDATING'
+        port = self._port_open()
+        if self._process_alive():
+            # Processo aberto mas o RCON ainda não responde: o CS2 está carregando.
+            return 'ONLINE' if port else 'STARTING'
+        # Se o Agent reiniciar enquanto o CS2 continuar aberto, o RCON/porta local
+        # confirma que o processo existe.
+        return 'ONLINE' if port else 'OFFLINE'
 
     def start(self):
-        if self.status == 'ONLINE':
+        if self.status in ('ONLINE', 'STARTING'):
             return {'ok': True, 'result': 'Servidor já estava online.'}
         exe = self.cfg['exe']
         try:
@@ -225,7 +300,7 @@ class CS2Process:
         return {'ok': True, 'result': f'Servidor iniciado. PID {self.process.pid}.'}
 
     def stop(self):
-        if self.status != 'ONLINE':
+        if not self._process_alive() and not self._port_open():
             return {'ok': True, 'result': 'Servidor já estava offline.'}
 
         if self.process and self.process.poll() is None:
@@ -283,6 +358,14 @@ class CS2Process:
         return 27015
 
     def telemetry(self):
+        data = self._telemetry()
+        data['version'] = dict(self.version)
+        data['update'] = {k: v for k, v in self.update.items() if k != 'log'}
+        data['update']['log'] = self.update['log'][-12:]
+        data['auto_update'] = self.auto_update
+        return data
+
+    def _telemetry(self):
         if self.status != 'ONLINE':
             return {'online': False, 'rcon_ok': False, 'players': [], 'player_count': 0, 'player_source': 'offline'}
 
@@ -318,6 +401,12 @@ class CS2Process:
             return self.stop()
         if command == 'RESTART':
             return self.restart()
+        if command == 'UPDATE':
+            return self.start_update('manual')
+        if command == 'CHECK_UPDATE':
+            v = self.check_version(force=True)
+            if v.get('error'): return {'ok': False, 'error': v['error']}
+            return {'ok': True, 'result': 'Atualizado.' if v.get('up_to_date') else f"Atualização disponível: {v.get('required')}"}
         if command == 'RCON':
             raw = (payload or {}).get('command', '').strip()
             if not raw:

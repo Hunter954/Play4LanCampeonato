@@ -50,8 +50,17 @@ def heartbeat():
         row.display_name = server_data.get('display_name', server_data['code'])
         row.status = server_data.get('status', 'UNKNOWN')
         row.last_heartbeat = datetime.utcnow()
+        row.agent_version = (data.get('agent_version') or '')[:20] or None
 
         telemetry = enrich_telemetry(server_data.get('telemetry') or {})
+        version = telemetry.get('version') or {}
+        if version.get('installed'):
+            row.installed_version = version.get('installed'); row.required_version = version.get('required')
+            row.up_to_date = version.get('up_to_date')
+            if version.get('checked_at'): row.version_checked_at = datetime.utcfromtimestamp(int(version['checked_at']))
+        update = telemetry.get('update') or {}
+        if update.get('state'):
+            row.update_state = update.get('state'); row.update_message = (update.get('message') or '')[:255]
         # O retorno bruto do comando status fica disponível no histórico RCON;
         # não precisamos trafegá-lo/gravar a cada heartbeat.
         telemetry.pop('raw', None)
@@ -94,12 +103,18 @@ def heartbeat():
             'server_id': row.code,
             'display_name': row.display_name or row.code,
             'host_id': row.host_id,
-            'status': row.status,
+            'status': row.live_status,
             'last_heartbeat': _iso(row.last_heartbeat),
             'payload': telemetry,
         })
 
-    return jsonify(ok=True)
+    # Preferências que o Agent aplica: atualização automática e se há partida rodando (bloqueia auto-update).
+    settings = {}
+    for row, _ in realtime_updates:
+        match = db.session.get(Match, row.current_match_id) if row.current_match_id else None
+        settings[row.code] = {'auto_update': row.auto_update is not False,
+                              'busy': bool(match and match.status in ('LOADED', 'LIVE'))}
+    return jsonify(ok=True, settings=settings)
 
 
 @bp.get('/agent/commands/<host_id>')

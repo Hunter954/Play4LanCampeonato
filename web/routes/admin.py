@@ -7,7 +7,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from web.extensions import db, socketio
 from web.live_state import get_server_state
-from web.models import AdminSetting, Match, MatchEvent, Server, ServerCommand, Tournament, TournamentRegistration
+from web.models import AdminSetting, Match, MatchEvent, Server, ServerCommand, Tournament, TournamentRegistration, User
 from web.player_identity import enrich_telemetry
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -59,11 +59,18 @@ def _latest_telemetry(code):
     return enrich_telemetry(event.payload or {}) if event else {}
 
 
+STATUS_TEXT = {'ONLINE':'Online','OFFLINE':'Desligado','STARTING':'Iniciando','UPDATING':'Atualizando','NO_SIGNAL':'Agent sem sinal'}
+
+
 def _server_snapshot(server, telemetry=None):
     telemetry = telemetry if telemetry is not None else _latest_telemetry(server.code)
+    status = server.live_status
+    if status == 'NO_SIGNAL': telemetry = {**(telemetry or {}), 'players': [], 'player_count': 0, 'online': False, 'rcon_ok': False}
     return {'code':server.code,'display_name':server.display_name or server.code,'host_id':server.host_id,
-            'status':server.status or 'UNKNOWN','last_heartbeat':_dt(server.last_heartbeat),
-            'current_match_id':server.current_match_id,'telemetry':telemetry or {}}
+            'status':status,'status_label':STATUS_TEXT.get(status,status),'last_heartbeat':_dt(server.last_heartbeat),
+            'current_match_id':server.current_match_id,'telemetry':telemetry or {},
+            'version':{'installed':server.installed_version,'required':server.required_version,'up_to_date':server.up_to_date,
+                       'update_state':server.update_state,'update_message':server.update_message,'auto_update':server.auto_update is not False}}
 
 
 def _command_snapshot(c):
@@ -86,31 +93,44 @@ def _queued(server,row):
 REVIEW_STATUSES = ('PENDING', 'PAYMENT_REVIEW')
 
 
+@bp.app_context_processor
+def _admin_nav():
+    def admin_nav():
+        servers = Server.query.order_by(Server.code).all()
+        return {'servers': servers, 'outdated': sum(1 for s in servers if s.needs_update), 'pending': _pending_registrations(),
+                'tournaments': Tournament.query.filter(Tournament.status != 'FINISHED').order_by(Tournament.id.desc()).limit(4).all()}
+    return {'admin_nav': admin_nav}
+
+
 def _pending_registrations():
     return TournamentRegistration.query.filter(TournamentRegistration.status.in_(REVIEW_STATUSES)).count()
 
 
 def _server_page(code, template, **extra):
-    server=Server.query.filter_by(code=code).first_or_404(); telemetry=_latest_telemetry(code)
-    return render_template(template, server=server, telemetry=telemetry, maps=MAPS, **extra)
+    server=Server.query.filter_by(code=code).first_or_404(); telemetry=_server_snapshot(server)['telemetry']
+    match=db.session.get(Match, server.current_match_id) if server.current_match_id else None
+    return render_template(template, server=server, telemetry=telemetry, maps=MAPS, current_match=match, **extra)
 
 
 @bp.get('/')
 @admin_only
 def dashboard():
-    servers=Server.query.order_by(Server.code).all(); states={s.code:_latest_telemetry(s.code) for s in servers}
-    return render_template('admin/dashboard.html',servers=servers,server_states=states,
-        pending_count=_pending_registrations(),tournaments=Tournament.query.order_by(Tournament.id.desc()).limit(5).all(),
+    servers=Server.query.order_by(Server.code).all(); snaps={s.code:_server_snapshot(s) for s in servers}
+    active=Tournament.query.filter(Tournament.status.in_(('REGISTRATION','CLOSED','RUNNING'))).order_by(Tournament.id.desc()).all()
+    live=Match.query.filter(Match.status.in_(('LIVE','LOADED','VETO','CONFIGURED'))).order_by(Match.id).all()
+    ready=Match.query.filter_by(status='READY').order_by(Match.id).limit(8).all()
+    return render_template('admin/dashboard.html',servers=servers,snaps=snaps,active_tournaments=active,live_matches=live,ready_matches=ready,
+        pending_count=_pending_registrations(),
         regs=TournamentRegistration.query.filter(TournamentRegistration.status.in_(REVIEW_STATUSES)).order_by(TournamentRegistration.id.desc()).limit(8).all(),
-        online_count=sum(1 for s in servers if (s.status or '').upper()=='ONLINE'),
-        players_total=sum(int((states.get(s.code) or {}).get('player_count') or 0) for s in servers),
-        matches=Match.query.order_by(Match.id.desc()).limit(6).all())
+        online_count=sum(1 for s in servers if s.live_status=='ONLINE'),
+        outdated=[s for s in servers if s.needs_update],
+        players_total=sum(int(snaps[s.code]['telemetry'].get('player_count') or 0) for s in servers))
 
 @bp.get('/api/overview')
 @admin_only
 def admin_overview_api():
     servers=Server.query.order_by(Server.code).all(); snaps=[_server_snapshot(s) for s in servers]
-    return jsonify(ok=True,servers=snaps,summary={'servers_online':sum(1 for s in snaps if s['status'].upper()=='ONLINE'),
+    return jsonify(ok=True,servers=snaps,summary={'servers_online':sum(1 for s in snaps if s['status']=='ONLINE'),
         'servers_total':len(snaps),'players_total':sum(int((s['telemetry'] or {}).get('player_count') or 0) for s in snaps),
         'pending_registrations':_pending_registrations()})
 
@@ -148,7 +168,7 @@ def server_logs(code):
 
 @bp.get('/servers/<code>/security')
 @admin_only
-def server_security(code): return _server_page(code,'admin/server_security.html')
+def server_security(code): return redirect(url_for('admin.security'))
 
 @bp.post('/servers/<code>/security/pin')
 @admin_only
@@ -164,10 +184,68 @@ def update_pin(code):
 @bp.post('/servers/<code>/<action>')
 @admin_only
 def server_action(code,action):
-    if action not in {'START','STOP','RESTART'}: abort(400)
+    if action not in {'START','STOP','RESTART','UPDATE','CHECK_UPDATE'}: abort(400)
     denied=_require_pin()
     if denied:return denied
-    server=Server.query.filter_by(code=code).first_or_404(); return _queued(server,queue_command(server,action))
+    server=Server.query.filter_by(code=code).first_or_404()
+    if not server.has_signal:
+        return jsonify(ok=False,error='O Agent deste servidor está sem sinal. Abra o Agent no PC da LAN antes.'),409
+    if action=='UPDATE':
+        match=db.session.get(Match, server.current_match_id) if server.current_match_id else None
+        if match and match.status in ('LOADED','LIVE'):
+            return jsonify(ok=False,error='Há uma partida em andamento neste servidor. Termine ou libere a partida antes de atualizar.'),409
+        server.update_state='RUNNING'; server.update_message='Comando enviado ao Agent...'
+    return _queued(server,queue_command(server,action))
+
+@bp.post('/servers/<code>/auto-update')
+@admin_only
+def server_auto_update(code):
+    server=Server.query.filter_by(code=code).first_or_404()
+    server.auto_update=request.form.get('enabled')=='1'; db.session.commit()
+    msg='Atualização automática ligada: o servidor atualiza sozinho quando estiver vazio e sem partida.' if server.auto_update else 'Atualização automática desligada.'
+    return jsonify(ok=True,message=msg,reload=True) if _is_ajax() else redirect(url_for('admin.server_detail',code=code))
+
+@bp.get('/servers/')
+@admin_only
+def servers_list():
+    servers=Server.query.order_by(Server.code).all()
+    return render_template('admin/servers.html',servers=servers,snaps={s.code:_server_snapshot(s) for s in servers})
+
+@bp.get('/jogadores')
+@admin_only
+def players_admin():
+    q=(request.args.get('q') or '').strip()
+    query=User.query
+    if q:
+        like=f'%{q}%'; query=query.filter(db.or_(User.nickname.ilike(like),User.steam_name.ilike(like),User.real_name.ilike(like),User.steam_id64.ilike(like),User.email.ilike(like)))
+    users=query.order_by(User.is_admin.desc(),User.created_at.desc()).limit(300).all()
+    return render_template('admin/players.html',users=users,q=q,total=User.query.count())
+
+@bp.post('/jogadores/<int:uid>/admin')
+@admin_only
+def toggle_admin(uid):
+    denied=_require_pin()
+    if denied:return denied
+    u=db.get_or_404(User,uid)
+    if u.id==current_user.id: return jsonify(ok=False,error='Você não pode remover o seu próprio acesso de admin.'),400
+    u.is_admin=not u.is_admin; db.session.commit()
+    return jsonify(ok=True,message=f"{u.display_name} {'agora é admin' if u.is_admin else 'não é mais admin'}.",reload=True)
+
+@bp.get('/seguranca')
+@admin_only
+def security():
+    return render_template('admin/security.html')
+
+@bp.post('/seguranca/pin')
+@admin_only
+def security_pin():
+    denied=_require_pin()
+    if denied: return denied
+    new_pin=(request.form.get('new_pin') or '').strip(); confirm=(request.form.get('confirm_pin') or '').strip()
+    if not re.fullmatch(r'\d{4}',new_pin) or new_pin!=confirm:
+        return jsonify(ok=False,error='O novo PIN deve ter 4 dígitos e a confirmação precisa ser igual.'),400
+    row=_pin_hash(); row.value=generate_password_hash(new_pin); db.session.commit()
+    return jsonify(ok=True,message='PIN de operação alterado.')
 
 @bp.post('/servers/<code>/quick/<action>')
 @admin_only

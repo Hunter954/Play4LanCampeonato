@@ -1,0 +1,36 @@
+{% extends 'admin_base.html' %}
+{% block title %}Jogadores · Admin PLAY4LAN{% endblock %}
+{% block top_title %}Jogadores{% endblock %}
+{% block content %}
+<div class="admin-page">
+  <section class="admin-hero">
+    <div><span class="eyebrow"><i class="bi bi-person-badge"></i> COMUNIDADE</span><h1>Jogadores</h1><p>{{ total }} contas. Busque por nick, nome, SteamID ou e-mail. Para dar acesso ao painel a uma conta Steam, use "Tornar admin".</p></div>
+  </section>
+  <section class="admin-panel">
+    <form class="search-inline" method="get"><input name="q" value="{{ q }}" placeholder="Nick, nome, SteamID64 ou e-mail"><button class="button"><i class="bi bi-search"></i> Buscar</button></form>
+    <div class="table-scroll" style="margin-top:16px">
+      <table class="admin-table players-table">
+        <thead><tr><th>Jogador</th><th>Nome real</th><th>SteamID64</th><th>WhatsApp</th><th>Times</th><th>Cadastro</th><th></th></tr></thead>
+        <tbody>
+        {% for u in users %}
+        <tr>
+          <td><div class="who">{% if u.avatar %}<img src="{{ u.avatar }}" alt="">{% else %}<span class="ph">{{ u.display_name[:1]|upper }}</span>{% endif %}<div><b>{{ u.display_name }}</b>{% if u.is_admin %} <span class="soft-badge approved">ADMIN</span>{% endif %}<br><small class="muted">{{ u.email or ('desde ' ~ u.created_at.strftime('%d/%m/%Y') if u.created_at) }}</small></div></div></td>
+          <td>{{ u.real_name or '—' }}</td>
+          <td>{% if u.steam_id64 %}<a href="{{ u.steam_profile_url or 'https://steamcommunity.com/profiles/' ~ u.steam_id64 }}" target="_blank"><code>{{ u.steam_id64 }}</code></a>{% else %}—{% endif %}</td>
+          <td>{{ u.whatsapp or '—' }}</td>
+          <td>{% for m in u.memberships %}<a href="/teams/{{ m.team_id }}" target="_blank" class="soft-badge">{{ m.team.tag }}</a> {% else %}<span class="muted">—</span>{% endfor %}</td>
+          <td>{% if u.is_onboarded %}<span class="soft-badge approved">Completo</span>{% elif u.steam_id64 %}<span class="soft-badge pending">Pendente</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td class="row-actions">
+            {% if u.steam_id64 %}<a class="icon-button" href="/jogadores/{{ u.id }}" target="_blank" title="Perfil público"><i class="bi bi-box-arrow-up-right"></i></a>{% endif %}
+            {% if u.id != current_user.id %}
+            <form class="js-async-form js-secure-form" data-action-label="{{ 'Remover admin de' if u.is_admin else 'Tornar admin' }}: {{ u.display_name }}" method="post" action="/admin/jogadores/{{ u.id }}/admin"><button class="button {{ 'ghost' if u.is_admin else 'secondary' }} small">{{ 'Remover admin' if u.is_admin else 'Tornar admin' }}</button></form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}<tr><td colspan="7" class="muted">Nenhum jogador encontrado.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

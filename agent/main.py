@@ -6,6 +6,8 @@ from agent.client import PlatformClient
 from agent.cs2 import CS2Process
 from agent.queue import OfflineQueue
 
+AGENT_VERSION = '1.1.0'
+
 
 def load_cfg():
     path = pathlib.Path('agent/config.json')
@@ -17,25 +19,34 @@ def load_cfg():
 def build_heartbeat(cfg, servers):
     rows = []
     for code, process in servers.items():
+        process.check_version()  # consulta a Valve no máximo a cada 5 min
         telemetry = process.telemetry()
+        process.last_player_count = int(telemetry.get('player_count') or 0)
         rows.append({
             'code': code,
             'display_name': process.cfg.get('display_name', code),
             'status': process.status,
             'telemetry': telemetry,
         })
-    return {'host_id': cfg['host_id'], 'servers': rows}
+    return {'host_id': cfg['host_id'], 'agent_version': AGENT_VERSION, 'servers': rows}
 
 
 def send_heartbeat(client, cfg, servers):
-    client.heartbeat(build_heartbeat(cfg, servers))
+    reply = client.heartbeat(build_heartbeat(cfg, servers)) or {}
+    # O painel manda as preferências de cada servidor (atualização automática) e se há partida em andamento.
+    for code, settings in (reply.get('settings') or {}).items():
+        process = servers.get(code)
+        if not process: continue
+        if 'auto_update' in settings: process.auto_update = bool(settings['auto_update'])
+        if process.maybe_auto_update(getattr(process, 'last_player_count', 0), bool(settings.get('busy'))):
+            print(f'{code}: atualização automática iniciada (versão exigida pela Valve: {process.version.get("required")})')
 
 
 def main():
     cfg = load_cfg()
     client = PlatformClient(cfg['platform_url'], cfg['token'])
     queue = OfflineQueue()
-    servers = {item['code']: CS2Process(item) for item in cfg['servers']}
+    servers = {item['code']: CS2Process(item, cfg) for item in cfg['servers']}
 
     # Para o painel parecer realmente vivo, limitamos o intervalo máximo a 3s.
     # heartbeat_seconds continua podendo reduzir esse valor no config.json.
@@ -43,7 +54,9 @@ def main():
     command_poll_seconds = max(0.5, min(float(cfg.get('command_poll_seconds', 1)), 2.0))
     last_hb = 0.0
 
-    print('PLAY4LAN Agent:', cfg['host_id'])
+    print(f"PLAY4LAN Agent {AGENT_VERSION}:", cfg['host_id'])
+    for code, process in servers.items():
+        print(f'  {code}: instalação {process.install_dir} | SteamCMD {process.steamcmd}')
     print(f'Telemetria: {heartbeat_seconds:.1f}s | comandos: {command_poll_seconds:.1f}s')
 
     while True:

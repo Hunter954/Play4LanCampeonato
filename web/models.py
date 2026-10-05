@@ -171,9 +171,23 @@ class MatchEvent(db.Model):
     id=db.Column(db.Integer, primary_key=True); event_uuid=db.Column(db.String(80), unique=True, nullable=False); server_id=db.Column(db.String(50)); match_id=db.Column(db.Integer, db.ForeignKey('match.id'))
     event_type=db.Column(db.String(80), nullable=False); payload=db.Column(db.JSON, default=dict); created_at=db.Column(db.DateTime, default=now)
 
+SIGNAL_TIMEOUT = 20  # segundos sem heartbeat = Agent fora do ar
+
 class Server(db.Model):
     id=db.Column(db.Integer, primary_key=True); code=db.Column(db.String(50), unique=True, nullable=False); display_name=db.Column(db.String(100)); host_id=db.Column(db.String(100))
     status=db.Column(db.String(30), default='OFFLINE'); current_match_id=db.Column(db.Integer, db.ForeignKey('match.id')); last_heartbeat=db.Column(db.DateTime)
+    auto_update=db.Column(db.Boolean, default=True); agent_version=db.Column(db.String(20))
+    installed_version=db.Column(db.String(30)); required_version=db.Column(db.String(30)); up_to_date=db.Column(db.Boolean)
+    version_checked_at=db.Column(db.DateTime); update_state=db.Column(db.String(20)); update_message=db.Column(db.String(255))
+
+    @property
+    def has_signal(self): return bool(self.last_heartbeat and (now() - self.last_heartbeat).total_seconds() <= SIGNAL_TIMEOUT)
+    @property
+    def live_status(self):
+        """Status real: se o Agent parou de mandar sinal, não dá para afirmar que o servidor está online."""
+        return (self.status or 'OFFLINE') if self.has_signal else 'NO_SIGNAL'
+    @property
+    def needs_update(self): return self.up_to_date is False
 
 class ServerCommand(db.Model):
     id=db.Column(db.Integer, primary_key=True); host_id=db.Column(db.String(100), nullable=False); server_code=db.Column(db.String(50)); command=db.Column(db.String(80), nullable=False)

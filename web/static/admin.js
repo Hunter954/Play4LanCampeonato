@@ -23,12 +23,32 @@
     setTimeout(() => node.remove(), 4200);
   }
 
+  const STATUS_TEXT = {ONLINE: 'Online', OFFLINE: 'Desligado', STARTING: 'Iniciando', UPDATING: 'Atualizando', NO_SIGNAL: 'Agent sem sinal',
+    INICIANDO: 'Iniciando', REINICIANDO: 'Reiniciando', PARANDO: 'Desligando', ATUALIZANDO: 'Atualizando'};
   function setStatusBadge(el, status) {
     if (!el) return;
     const large = el.classList.contains('large');
     const normalized = String(status || 'UNKNOWN').toLowerCase().replace(/[^a-z0-9_-]/g, '');
     el.className = `status-badge${large ? ' large' : ''} ${normalized}`;
-    el.innerHTML = `<span></span>${escapeHtml(status || 'UNKNOWN')}`;
+    el.innerHTML = `<span></span>${escapeHtml(STATUS_TEXT[status] || status || '—')}`;
+  }
+
+  // Menu lateral no celular
+  $$('[data-adm-open]').forEach(b => b.addEventListener('click', () => document.body.classList.add('nav-open')));
+  $$('[data-adm-close]').forEach(b => b.addEventListener('click', () => document.body.classList.remove('nav-open')));
+
+  // Atualização do CS2 em andamento: recarrega quando terminar
+  const updRoot = $('[data-update-state]');
+  if (updRoot && updRoot.dataset.updateState === 'RUNNING') {
+    setInterval(async () => {
+      try {
+        const res = await fetch(`/admin/api/servers/${encodeURIComponent(updRoot.dataset.serverCode)}/state`, {headers: {Accept: 'application/json'}});
+        const d = await res.json(); const u = (d.server?.telemetry || {}).update || {};
+        const msg = $('[data-update-message]'); if (msg && u.message) msg.textContent = u.message;
+        const log = $('[data-update-log]'); if (log && u.log) { log.textContent = u.log.join('\n'); log.scrollTop = log.scrollHeight; }
+        if (d.server?.version?.update_state && d.server.version.update_state !== 'RUNNING') location.reload();
+      } catch (_) {}
+    }, 3000);
   }
 
   function formatMoney(v) {
@@ -191,7 +211,7 @@
       if (!res.ok) throw new Error(data.error || `Erro HTTP ${res.status}`);
       toast(data.message || 'Ação enviada', 'O servidor será atualizado automaticamente.');
       if (data.reload) setTimeout(() => location.reload(), 700);
-      if (form.action.includes('/security/pin') && form.querySelector('[name="new_pin"]')) form.reset();
+      if (/\/(security|seguranca)\/pin/.test(form.action) && form.querySelector('[name="new_pin"]')) form.reset();
       setTimeout(fetchServerState, 350);
       return true;
     } catch (err) {
@@ -247,5 +267,5 @@
   }
 
   if (currentServer) { fetchServerState(); setInterval(fetchServerState, 3000); }
-  if (endpoint === 'admin.dashboard') { fetchOverview(); setInterval(fetchOverview, 5000); }
+  if (['admin.dashboard', 'admin.servers_list'].includes(endpoint)) { fetchOverview(); setInterval(fetchOverview, 5000); }
 })();

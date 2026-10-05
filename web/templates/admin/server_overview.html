@@ -1,5 +1,58 @@
-{% extends 'base.html' %}{% block title %}{{ server.display_name }} · PLAY4LAN{% endblock %}{% block content %}<div class="admin-page server-page">{% include 'admin/_server_header.html' %}
-<section class="server-metrics compact"><div class="metric-card"><span class="metric-icon"><i class="bi bi-map"></i></span><div><span>Mapa</span><b data-role="metric-map">{{ telemetry.get('map','—') }}</b></div></div><div class="metric-card"><span class="metric-icon"><i class="bi bi-activity"></i></span><div><span>Fase</span><b data-role="metric-phase">{{ telemetry.get('phase','AGUARDANDO') }}</b></div></div><div class="metric-card"><span class="metric-icon"><i class="bi bi-people-fill"></i></span><div><span>Jogadores</span><b data-role="metric-players">{{ telemetry.get('player_count',0) }}/10</b></div></div><div class="metric-card"><span class="metric-icon"><i class="bi bi-wifi"></i></span><div><span>RCON</span><b data-role="metric-rcon">{{ 'OK' if telemetry.get('rcon_ok') else '—' }}</b></div></div></section>
-<section class="admin-panel"><div class="panel-heading"><div><span class="section-kicker">PROCESSO</span><h2>Servidor</h2><p>Ligar, reiniciar ou desligar o processo dedicado.</p></div></div><div class="command-cards three"><form class="js-async-form js-secure-form" data-action-label="Ligar o servidor" data-pending-status="INICIANDO" method="post" action="/admin/servers/{{server.code}}/START"><button class="command-card success"><i class="bi bi-play-fill"></i><span><b>Ligar servidor</b><small>Iniciar o processo CS2</small></span></button></form><form class="js-async-form js-secure-form" data-action-label="Reiniciar o servidor" data-pending-status="REINICIANDO" method="post" action="/admin/servers/{{server.code}}/RESTART"><button class="command-card"><i class="bi bi-arrow-clockwise"></i><span><b>Reiniciar</b><small>Parar e iniciar novamente</small></span></button></form><form class="js-async-form js-secure-form" data-action-label="Desligar o servidor" data-pending-status="PARANDO" method="post" action="/admin/servers/{{server.code}}/STOP"><button class="command-card danger-soft"><i class="bi bi-stop-fill"></i><span><b>Desligar</b><small>Encerrar completamente</small></span></button></form></div></section>
-<section class="overview-links"><a href="{{ url_for('admin.server_players',code=server.code) }}"><i class="bi bi-people-fill"></i><span><b>Jogadores</b><small>Vida, dinheiro, K/D/A, arma e ações</small></span><i class="bi bi-chevron-right"></i></a><a href="{{ url_for('admin.server_match',code=server.code) }}"><i class="bi bi-controller"></i><span><b>Operar partida</b><small>Faca, pausas, mapa e teste</small></span><i class="bi bi-chevron-right"></i></a><a href="{{ url_for('admin.server_chat',code=server.code) }}"><i class="bi bi-chat-left-text-fill"></i><span><b>Chat ao vivo</b><small>Acompanhar conversa do servidor</small></span><i class="bi bi-chevron-right"></i></a><a href="{{ url_for('admin.server_backups',code=server.code) }}"><i class="bi bi-clock-history"></i><span><b>Restaurar partida</b><small>Backups automáticos por round</small></span><i class="bi bi-chevron-right"></i></a></section>
-</div>{% endblock %}
+{% extends 'admin_base.html' %}
+{% block title %}{{ server.display_name or server.code }} · Admin PLAY4LAN{% endblock %}
+{% block top_title %}{{ server.display_name or server.code }}{% endblock %}
+{% block content %}
+<div class="admin-page server-page">
+{% include 'admin/_server_header.html' %}
+
+<section class="server-metrics compact">
+  <div class="metric-card"><span class="metric-icon"><i class="bi bi-map"></i></span><div><span>Mapa</span><b data-role="metric-map">{{ telemetry.get('map','—') }}</b></div></div>
+  <div class="metric-card"><span class="metric-icon"><i class="bi bi-activity"></i></span><div><span>Fase</span><b data-role="metric-phase">{{ telemetry.get('phase','AGUARDANDO') }}</b></div></div>
+  <div class="metric-card"><span class="metric-icon"><i class="bi bi-people-fill"></i></span><div><span>Jogadores</span><b data-role="metric-players">{{ telemetry.get('player_count',0) }}/10</b></div></div>
+  <div class="metric-card"><span class="metric-icon"><i class="bi bi-wifi"></i></span><div><span>RCON</span><b data-role="metric-rcon">{{ 'OK' if telemetry.get('rcon_ok') else '—' }}</b></div></div>
+</section>
+
+<section class="admin-panel">
+  <div class="panel-heading"><div><span class="section-kicker">PROCESSO</span><h2>Ligar e desligar</h2><p>Controla o processo do CS2 no PC da LAN. Todas as ações pedem o PIN.</p></div></div>
+  <div class="command-cards three">
+    <form class="js-async-form js-secure-form" data-action-label="Ligar o servidor" data-pending-status="INICIANDO" method="post" action="/admin/servers/{{server.code}}/START"><button class="command-card success"><i class="bi bi-play-fill"></i><span><b>Ligar</b><small>Iniciar o CS2</small></span></button></form>
+    <form class="js-async-form js-secure-form" data-action-label="Reiniciar o servidor" data-pending-status="REINICIANDO" method="post" action="/admin/servers/{{server.code}}/RESTART"><button class="command-card"><i class="bi bi-arrow-clockwise"></i><span><b>Reiniciar</b><small>Desligar e ligar de novo</small></span></button></form>
+    <form class="js-async-form js-secure-form" data-action-label="Desligar o servidor" data-pending-status="PARANDO" method="post" action="/admin/servers/{{server.code}}/STOP"><button class="command-card danger-soft"><i class="bi bi-stop-fill"></i><span><b>Desligar</b><small>Encerrar o CS2</small></span></button></form>
+  </div>
+</section>
+
+<section class="admin-panel" id="versao" data-update-state="{{ server.update_state or '' }}" data-server-code="{{ server.code }}">
+  <div class="panel-heading"><div><span class="section-kicker">VERSÃO DO CS2</span><h2>Atualização</h2><p>O Agent consulta a Valve a cada 5 minutos. Quando sai update, jogadores com o CS2 atualizado não conseguem entrar num servidor desatualizado.</p></div></div>
+  {% if server.update_state == 'RUNNING' %}
+  <div class="update-alert running"><i class="bi bi-arrow-repeat"></i><div><b>Atualizando o servidor...</b><small data-update-message>{{ server.update_message or 'Aguardando o Agent' }}</small></div></div>
+  <pre class="update-log" data-update-log>{{ (telemetry.get('update') or {}).get('log', [])|join('\n') }}</pre>
+  {% elif server.update_state == 'FAILED' %}
+  <div class="update-alert failed"><i class="bi bi-x-octagon"></i><div><b>A última atualização falhou</b><small>{{ server.update_message }}</small></div></div>
+  {% elif server.needs_update %}
+  <div class="update-alert"><i class="bi bi-arrow-up-circle-fill"></i><div><b>Atualização disponível: {{ server.required_version or 'nova versão' }}</b><small>Instalada: {{ server.installed_version }}. {{ 'Vai atualizar sozinho quando estiver vazio e sem partida.' if server.auto_update is not false else 'Atualização automática desligada: atualize manualmente.' }}</small></div></div>
+  {% elif server.update_state == 'DONE' and server.update_message %}
+  <div class="update-alert" style="border-color:rgba(47,212,124,.35);background:rgba(47,212,124,.08)"><i class="bi bi-check-circle-fill" style="color:#2fd47c"></i><div><b>{{ server.update_message }}</b></div></div>
+  {% endif %}
+  <div class="version-panel" style="margin-top:14px">
+    <div class="version-box"><span>Instalada</span><b>{{ server.installed_version or '—' }}</b></div>
+    <div class="version-box {{ 'ok' if server.up_to_date else 'bad' if server.up_to_date is false }}"><span>Exigida pela Valve</span><b>{{ server.required_version or '—' }}</b></div>
+    <div class="version-box {{ 'ok' if server.up_to_date else 'bad' if server.up_to_date is false }}"><span>Situação</span><b>{% if server.up_to_date %}Atualizado{% elif server.up_to_date is false %}Desatualizado{% else %}Sem dados{% endif %}</b><small class="muted">{{ 'Verificado ' ~ server.version_checked_at.strftime('%d/%m %H:%M') ~ ' UTC' if server.version_checked_at }}</small></div>
+    <div class="version-actions">
+      <form class="js-async-form js-secure-form" data-action-label="Atualizar o CS2 deste servidor (SteamCMD)" data-pending-status="ATUALIZANDO" method="post" action="/admin/servers/{{ server.code }}/UPDATE" data-confirm="O servidor será desligado, atualizado pelo SteamCMD e ligado de novo. Continuar?"><button class="button full" {{ 'disabled' if server.update_state == 'RUNNING' }}><i class="bi bi-cloud-arrow-down"></i> Atualizar agora</button></form>
+      <form class="js-async-form js-secure-form" data-action-label="Verificar atualização na Valve" method="post" action="/admin/servers/{{ server.code }}/CHECK_UPDATE"><button class="button ghost full"><i class="bi bi-search"></i> Verificar agora</button></form>
+    </div>
+  </div>
+  <form class="js-async-form" method="post" action="/admin/servers/{{ server.code }}/auto-update" style="margin-top:16px">
+    <input type="hidden" name="enabled" value="{{ '0' if server.auto_update is not false else '1' }}">
+    <label class="switch"><input type="checkbox" {{ 'checked' if server.auto_update is not false }} onchange="this.form.requestSubmit()"> Atualizar sozinho quando sair update (só com o servidor vazio e sem partida em andamento)</label>
+  </form>
+</section>
+
+<section class="overview-links">
+  <a href="{{ url_for('admin.server_players',code=server.code) }}"><i class="bi bi-people-fill"></i><span><b>Jogadores</b><small>Vida, dinheiro, K/D/A e ações</small></span><i class="bi bi-chevron-right"></i></a>
+  <a href="{{ url_for('admin.server_match',code=server.code) }}"><i class="bi bi-controller"></i><span><b>Operar partida</b><small>Faca, pausas, mapa e teste</small></span><i class="bi bi-chevron-right"></i></a>
+  <a href="{{ url_for('admin.server_chat',code=server.code) }}"><i class="bi bi-chat-left-text-fill"></i><span><b>Chat ao vivo</b><small>Conversa do servidor</small></span><i class="bi bi-chevron-right"></i></a>
+  <a href="{{ url_for('admin.server_backups',code=server.code) }}"><i class="bi bi-clock-history"></i><span><b>Restaurar round</b><small>Backups automáticos</small></span><i class="bi bi-chevron-right"></i></a>
+</section>
+</div>
+{% endblock %}

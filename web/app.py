@@ -18,6 +18,8 @@ ADDED_COLUMNS = {
     'match': {'bracket': 'VARCHAR(10)', 'round': 'INTEGER', 'position': 'INTEGER', 'label': 'VARCHAR(60)', 'team1_from': 'VARCHAR(20)', 'team2_from': 'VARCHAR(20)',
               'next_match_id': 'INTEGER', 'next_slot': 'INTEGER', 'loser_match_id': 'INTEGER', 'loser_slot': 'INTEGER', 'winner_id': 'INTEGER',
               'walkover': 'BOOLEAN DEFAULT FALSE', 'config_token': 'VARCHAR(64)', 'started_at': 'TIMESTAMP', 'finished_at': 'TIMESTAMP'},
+    'server': {'auto_update': 'BOOLEAN DEFAULT TRUE', 'agent_version': 'VARCHAR(20)', 'installed_version': 'VARCHAR(30)', 'required_version': 'VARCHAR(30)',
+               'up_to_date': 'BOOLEAN', 'version_checked_at': 'TIMESTAMP', 'update_state': 'VARCHAR(20)', 'update_message': 'VARCHAR(255)'},
 }
 
 STATUS_LABELS = {
@@ -26,6 +28,7 @@ STATUS_LABELS = {
     'AWAITING_PAYMENT': 'Aguardando pagamento', 'PAYMENT_REVIEW': 'Pagamento em análise',
     'WAITING': 'Aguardando times', 'READY': 'Pronta', 'VETO': 'Veto de mapas', 'CONFIGURED': 'Mapas definidos', 'LOADED': 'No servidor',
     'UPPER': 'Upper', 'LOWER': 'Lower', 'FINAL': 'Grande final',
+    'ONLINE': 'Online', 'OFFLINE': 'Desligado', 'STARTING': 'Iniciando', 'UPDATING': 'Atualizando', 'NO_SIGNAL': 'Agent sem sinal',
     'DOUBLE_ELIMINATION': 'Dupla eliminação', 'SINGLE_ELIMINATION': 'Eliminação simples', 'SWISS': 'Suíço', 'ROUND_ROBIN': 'Pontos corridos',
 }
 

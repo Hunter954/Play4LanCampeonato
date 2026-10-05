@@ -1,127 +1,85 @@
-{% extends 'base.html' %}
-{% block title %}Central de Operações · PLAY4LAN{% endblock %}
+{% extends 'admin_base.html' %}
+{% block title %}Visão geral · Admin PLAY4LAN{% endblock %}
+{% block top_title %}Visão geral{% endblock %}
 {% block content %}
 <div class="admin-page" id="admin-dashboard">
   <section class="admin-hero">
+    <div><span class="eyebrow"><i class="bi bi-broadcast-pin"></i> CENTRAL DE OPERAÇÕES</span><h1>Visão geral</h1><p>Campeonatos, partidas e servidores numa tela só. Os números atualizam sozinhos.</p></div>
+    <div class="hero-actions"><a class="button" href="/admin/tournaments/create"><i class="bi bi-plus-lg"></i> Novo campeonato</a></div>
+  </section>
+
+  <section class="kpi-grid">
+    <div class="kpi"><i class="bi bi-hdd-rack"></i><div><span>Servidores online</span><b id="summary-servers-online">{{ online_count }}</b><small>de {{ servers|length }} cadastrados</small></div></div>
+    <div class="kpi"><i class="bi bi-people-fill"></i><div><span>Jogadores no servidor</span><b id="summary-players">{{ players_total }}</b><small>agora</small></div></div>
+    <a class="kpi {{ 'alert' if pending_count }}" href="#registrations"><i class="bi bi-person-check-fill"></i><div><span>Inscrições p/ revisar</span><b id="summary-pending">{{ pending_count }}</b><small>pagamentos em análise</small></div></a>
+    <a class="kpi {{ 'alert' if outdated }}" href="/admin/servers/"><i class="bi bi-cloud-arrow-down"></i><div><span>Servidores desatualizados</span><b>{{ outdated|length }}</b><small>{{ 'update do CS2 disponível' if outdated else 'tudo em dia' }}</small></div></a>
+  </section>
+
+  {% for s in outdated %}
+  <div class="update-alert"><i class="bi bi-arrow-up-circle-fill"></i><div><b>{{ s.display_name or s.code }}: atualização do CS2 disponível ({{ s.installed_version }} → {{ s.required_version }})</b><small>{{ 'Atualiza sozinho quando estiver vazio e sem partida.' if s.auto_update is not false else 'Atualização automática desligada.' }}</small></div><a class="button small" href="/admin/servers/{{ s.code }}#versao">Abrir</a></div>
+  {% endfor %}
+
+  <div class="dash-grid">
     <div>
-      <span class="eyebrow"><i class="bi bi-broadcast-pin"></i> PLAY4LAN CONTROL CENTER</span>
-      <h1>Central de Operações</h1>
-      <p>Servidores, partidas e inscrições em uma visão rápida. Os estados abaixo atualizam automaticamente.</p>
-    </div>
-    <div class="hero-actions">
-      <a class="button secondary" href="#servers"><i class="bi bi-hdd-rack"></i> Ver servidores</a>
-      <a class="button" href="/admin/tournaments/create"><i class="bi bi-plus-lg"></i> Novo campeonato</a>
-    </div>
-  </section>
+      <section class="admin-section">
+        <div class="section-heading"><div><span class="section-kicker">AGORA</span><h2>Partidas</h2></div></div>
+        <div class="list-panel mini-list">
+          {% for m in live_matches %}
+          <a href="/admin/tournaments/partidas/{{ m.id }}"><span class="soft-badge {{ 'live' if m.status == 'LIVE' else 'pending' }}">{{ m.status|label }}</span><b>{{ m.team1.name if m.team1 else '?' }} <span class="vs">vs</span> {{ m.team2.name if m.team2 else '?' }}</b><small class="muted">{{ m.label }}{% if m.server_id %} · {{ m.server_id }}{% endif %}</small><i class="bi bi-chevron-right muted"></i></a>
+          {% endfor %}
+          {% for m in ready_matches %}
+          <a href="/admin/tournaments/partidas/{{ m.id }}"><span class="soft-badge">Pronta</span><b>{{ m.team1.name }} <span class="vs">vs</span> {{ m.team2.name }}</b><small class="muted">{{ m.label }} · abrir veto</small><i class="bi bi-chevron-right muted"></i></a>
+          {% endfor %}
+          {% if not live_matches and not ready_matches %}<div class="muted"><i class="bi bi-controller"></i> Nenhuma partida em andamento ou pronta para chamar.</div>{% endif %}
+        </div>
+      </section>
 
-  <section class="overview-grid" aria-label="Resumo operacional">
-    <div class="overview-card">
-      <span class="overview-icon"><i class="bi bi-server"></i></span>
-      <div><span>Servidores online</span><b id="summary-servers-online">{{ online_count }}</b><small>de {{ servers|length }} cadastrados</small></div>
-    </div>
-    <div class="overview-card">
-      <span class="overview-icon"><i class="bi bi-people-fill"></i></span>
-      <div><span>Jogadores conectados</span><b id="summary-players">{{ players_total }}</b><small>telemetria ao vivo</small></div>
-    </div>
-    <div class="overview-card">
-      <span class="overview-icon"><i class="bi bi-person-check-fill"></i></span>
-      <div><span>Inscrições pendentes</span><b id="summary-pending">{{ pending_count }}</b><small>aguardando análise</small></div>
-    </div>
-    <div class="overview-card">
-      <span class="overview-icon"><i class="bi bi-trophy-fill"></i></span>
-      <div><span>Partidas recentes</span><b>{{ matches|length }}</b><small>últimos registros</small></div>
-    </div>
-  </section>
-
-  <section class="quick-launch">
-    <div class="section-heading">
-      <div><span class="section-kicker">ATALHOS</span><h2>Ações rápidas</h2></div>
-    </div>
-    <div class="quick-grid">
-      <a href="/admin/tournaments/create" class="quick-card"><i class="bi bi-trophy"></i><span><b>Novo campeonato</b><small>Criar chave e configurações</small></span><i class="bi bi-arrow-right"></i></a>
-      <a href="#servers" class="quick-card"><i class="bi bi-hdd-rack"></i><span><b>Gerenciar servidores</b><small>Status, jogadores e RCON</small></span><i class="bi bi-arrow-right"></i></a>
-      <a href="#registrations" class="quick-card"><i class="bi bi-person-check"></i><span><b>Revisar inscrições</b><small>{{ pending_count }} pendente(s)</small></span><i class="bi bi-arrow-right"></i></a>
-      <a href="#matches" class="quick-card"><i class="bi bi-controller"></i><span><b>Acompanhar partidas</b><small>Operação e histórico</small></span><i class="bi bi-arrow-right"></i></a>
-    </div>
-  </section>
-
-  <section id="servers" class="admin-section">
-    <div class="section-heading">
-      <div><span class="section-kicker">INFRAESTRUTURA</span><h2>Servidores</h2></div>
-      <div class="live-pill"><span class="live-dot"></span> Atualização automática</div>
-    </div>
-
-    <div class="server-grid">
-      {% for s in servers %}
-      {% set tel = server_states.get(s.code, {}) %}
-      <article class="server-tile" data-server-code="{{ s.code }}">
-        <div class="server-tile-head">
-          <div class="server-identity">
-            <span class="server-icon"><i class="bi bi-server"></i></span>
-            <div><span class="server-code">{{ s.code }}</span><h3>{{ s.display_name or s.code }}</h3></div>
+      <section id="servers" class="admin-section">
+        <div class="section-heading"><div><span class="section-kicker">INFRAESTRUTURA</span><h2>Servidores</h2></div><div class="live-pill"><span class="live-dot"></span> ao vivo</div></div>
+        {% for s in servers %}{% set snap = snaps[s.code] %}{% set tel = snap.telemetry %}
+        <article class="srv-card" data-server-code="{{ s.code }}">
+          <div class="srv-head">
+            <a href="/admin/servers/{{ s.code }}"><span class="server-icon"><i class="bi bi-hdd-rack"></i></span><div><small>{{ s.code }}</small><h3>{{ s.display_name or s.code }}</h3></div></a>
+            <span class="status-badge {{ snap.status|lower }}" data-role="status"><span></span>{{ snap.status_label }}</span>
           </div>
-          <span class="status-badge {{ s.status|lower }}" data-role="status"><span></span>{{ s.status }}</span>
-        </div>
-        <div class="server-live-metrics">
-          <div><i class="bi bi-map"></i><span>Mapa</span><b data-role="map">{{ tel.get('map','—') }}</b></div>
-          <div><i class="bi bi-people"></i><span>Jogadores</span><b data-role="players">{{ tel.get('player_count',0) }}/10</b></div>
-          <div><i class="bi bi-terminal"></i><span>RCON</span><b data-role="rcon">{{ 'OK' if tel.get('rcon_ok') else ('ERRO' if tel.get('online') else '—') }}</b></div>
-        </div>
-        <div class="server-foot">
-          <span class="heartbeat"><i class="bi bi-heart-pulse"></i> <span data-role="heartbeat">{{ s.last_heartbeat or 'Sem heartbeat' }}</span></span>
-          <a class="button secondary" href="{{ url_for('admin.server_detail', code=s.code) }}"><i class="bi bi-sliders"></i> Gerenciar</a>
-        </div>
-      </article>
-      {% else %}
-      <div class="empty-card"><i class="bi bi-cloud-slash"></i><h3>Nenhum Agent conectado</h3><p>Assim que o Agent PLAY4LAN enviar heartbeat, os servidores aparecerão aqui.</p></div>
-      {% endfor %}
+          <div class="srv-meta">
+            <span><i class="bi bi-map"></i> <b data-role="map">{{ tel.get('map') or '—' }}</b></span>
+            <span><i class="bi bi-people"></i> <b data-role="players">{{ tel.get('player_count', 0) }}/10</b></span>
+            <span><i class="bi bi-terminal"></i> RCON <b data-role="rcon">{{ 'OK' if tel.get('rcon_ok') else '—' }}</b></span>
+            <span><i class="bi bi-box-seam"></i> CS2 <b>{{ s.installed_version or '—' }}</b>{% if s.needs_update %} <i class="bi bi-arrow-up-circle-fill" style="color:#f5b83d" title="Atualização disponível"></i>{% endif %}</span>
+          </div>
+          <div class="srv-actions">
+            <form class="js-async-form js-secure-form" data-action-label="Ligar {{ s.code }}" method="post" action="/admin/servers/{{ s.code }}/START"><button class="button good small"><i class="bi bi-play-fill"></i> Ligar</button></form>
+            <form class="js-async-form js-secure-form" data-action-label="Reiniciar {{ s.code }}" method="post" action="/admin/servers/{{ s.code }}/RESTART"><button class="button ghost small"><i class="bi bi-arrow-clockwise"></i> Reiniciar</button></form>
+            <form class="js-async-form js-secure-form" data-action-label="Desligar {{ s.code }}" method="post" action="/admin/servers/{{ s.code }}/STOP"><button class="button ghost small"><i class="bi bi-stop-fill"></i> Desligar</button></form>
+            <a class="button secondary small" href="/admin/servers/{{ s.code }}"><i class="bi bi-sliders"></i> Gerenciar</a>
+          </div>
+        </article>
+        {% else %}
+        <div class="empty-card"><i class="bi bi-cloud-slash"></i><h3>Nenhum Agent conectado</h3><p>Abra o Agent no PC da LAN (scripts\run_agent_windows.bat). Os servidores aparecem aqui no primeiro sinal.</p></div>
+        {% endfor %}
+      </section>
     </div>
-  </section>
 
-  <section id="tournaments" class="admin-section">
-    <div class="section-heading">
-      <div><span class="section-kicker">COMPETIÇÕES</span><h2>Campeonatos</h2></div>
-      <a class="button secondary" href="/admin/tournaments/"><i class="bi bi-list-ul"></i> Todos</a>
-    </div>
-    <div class="list-panel">
-      {% for t in tournaments %}
-      <a class="admin-list-row" href="/admin/tournaments/{{ t.id }}">
-        <div class="list-avatar"><i class="bi bi-trophy-fill"></i></div>
-        <div class="list-main"><b>{{ t.name }}</b><span>{{ t.approved_count }}/{{ t.max_teams }} confirmados · {{ 'R$ %.2f'|format(t.entry_fee) if t.entry_fee_cents else 'Gratuito' }}</span></div>
-        <span class="soft-badge {{ t.status|lower }}">{{ t.status|label }}</span>
-        <i class="bi bi-chevron-right muted"></i>
-      </a>
-      {% else %}<div class="empty-inline"><i class="bi bi-trophy"></i> Nenhum campeonato. <a href="/admin/tournaments/create">Criar o primeiro</a></div>{% endfor %}
-    </div>
-  </section>
-
-  <div class="admin-two-column">
-    <section id="registrations" class="admin-section compact-section">
-      <div class="section-heading"><div><span class="section-kicker">EQUIPES</span><h2>Inscrições para revisar</h2></div></div>
-      <div class="list-panel">
-        {% for r in regs %}
-        <a class="admin-list-row" href="/admin/tournaments/{{ r.tournament_id }}" data-registration-id="{{ r.id }}">
-          <div class="list-avatar"><i class="bi bi-people-fill"></i></div>
-          <div class="list-main"><b>{{ r.team.name }}</b><span>{{ r.tournament.name }}{% if r.admin_note %} · {{ r.admin_note }}{% endif %}</span></div>
-          <span class="soft-badge pending">{{ r.status|label }}</span>
-          <i class="bi bi-chevron-right muted"></i>
-        </a>
-        {% else %}<div class="empty-inline"><i class="bi bi-inbox"></i> Nada para revisar. Pagamentos pelo Mercado Pago confirmam sozinhos.</div>{% endfor %}
-      </div>
-    </section>
-
-    <section id="matches" class="admin-section compact-section">
-      <div class="section-heading"><div><span class="section-kicker">COMPETITIVO</span><h2>Partidas recentes</h2></div></div>
-      <div class="list-panel">
-        {% for m in matches %}
-        <div class="admin-list-row">
-          <div class="list-avatar"><i class="bi bi-crosshair"></i></div>
-          <div class="list-main"><b>{{ m.team1.name if m.team1 else 'A definir' }} <span class="vs">vs</span> {{ m.team2.name if m.team2 else 'A definir' }}</b><span>{{ m.current_map or 'Mapa não definido' }} · BO{{ m.best_of }}</span></div>
-          <span class="soft-badge {{ m.status|lower }}">{{ m.status }}</span>
+    <div>
+      <section class="admin-section">
+        <div class="section-heading"><div><span class="section-kicker">COMPETIÇÕES</span><h2>Campeonatos ativos</h2></div><a class="button ghost small" href="/admin/tournaments/">Todos</a></div>
+        <div class="list-panel mini-list">
+          {% for t in active_tournaments %}
+          <a href="/admin/tournaments/{{ t.id }}"><i class="bi bi-trophy-fill" style="color:#ff7a1a"></i><b>{{ t.name }}</b><small class="muted">{{ t.approved_count }}/{{ t.max_teams }}</small><span class="soft-badge">{{ t.status|label }}</span></a>
+          {% else %}<div class="muted">Nenhum campeonato ativo. <a href="/admin/tournaments/create" style="color:#ff7a1a">Criar</a></div>{% endfor %}
         </div>
-        {% else %}<div class="empty-inline"><i class="bi bi-controller"></i> Nenhuma partida registrada.</div>{% endfor %}
-      </div>
-    </section>
+      </section>
+
+      <section id="registrations" class="admin-section">
+        <div class="section-heading"><div><span class="section-kicker">EQUIPES</span><h2>Inscrições p/ revisar</h2></div></div>
+        <div class="list-panel mini-list">
+          {% for r in regs %}
+          <a href="/admin/tournaments/{{ r.tournament_id }}"><i class="bi bi-people-fill muted"></i><b>{{ r.team.name }}</b><small class="muted">{{ r.tournament.name }}</small><span class="soft-badge pending">{{ r.status|label }}</span></a>
+          {% else %}<div class="muted"><i class="bi bi-check2-circle"></i> Nada para revisar. Pagamentos do Mercado Pago confirmam sozinhos.</div>{% endfor %}
+        </div>
+      </section>
+    </div>
   </div>
 </div>
 {% endblock %}

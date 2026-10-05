@@ -241,6 +241,67 @@ def test_telemetry_fallback_from_heartbeat(app):
     assert db.session.get(Match, m.id).status == 'LIVE' and db.session.get(Match, m.id).team1_score == 5
 
 
+# ---------------- Servidores: status real e atualização ----------------
+
+def _hb(app, version=None, status='ONLINE', players=0):
+    tel = {'players': [{'steam_id64': '1', 'name': 'x'}] * players, 'player_count': players}
+    if version: tel['version'] = version
+    return app.test_client().post('/api/v1/agent/heartbeat', headers={'Authorization': 'Bearer agent-test'},
+                                  json={'host_id': 'LAN', 'agent_version': '1.1.0', 'servers': [{'code': 'SERVER01', 'status': status, 'telemetry': tel}]})
+
+
+def test_heartbeat_version_settings_and_stale_status(app):
+    from datetime import timedelta
+    r = _hb(app, {'installed': '1.41.7.8', 'required': '1.41.8.8', 'up_to_date': False, 'checked_at': 1791242951})
+    assert r.get_json()['settings'] == {'SERVER01': {'auto_update': True, 'busy': False}}
+    s = Server.query.one()
+    assert s.installed_version == '1.41.7.8' and s.needs_update and s.agent_version == '1.1.0' and s.live_status == 'ONLINE'
+    s.last_heartbeat -= timedelta(seconds=60); db.session.commit()
+    assert db.session.get(Server, s.id).live_status == 'NO_SIGNAL'   # Agent parou: não mostra mais "online"
+
+
+def test_update_command_and_auto_update_toggle(app):
+    admin = user(admin=True); c = client_as(app, admin)
+    db.session.add(AdminSetting(key='admin_action_pin_hash', value=generate_password_hash('1234'))); db.session.commit()
+    _hb(app, {'installed': '1.41.7.8', 'required': '1.41.8.8', 'up_to_date': False})
+    ajax = {'X-Requested-With': 'XMLHttpRequest'}
+    assert c.post('/admin/servers/SERVER01/UPDATE', data={'pin': '1234'}, headers=ajax).status_code == 202
+    assert ServerCommand.query.filter_by(command='UPDATE').count() == 1
+    # partida rodando bloqueia a atualização
+    t = tournament(); m = _configured_match(t); m.status = 'LIVE'; Server.query.one().current_match_id = m.id; db.session.commit()
+    assert c.post('/admin/servers/SERVER01/UPDATE', data={'pin': '1234'}, headers=ajax).status_code == 409
+    assert _hb(app).get_json()['settings']['SERVER01']['busy'] is True
+    c.post('/admin/servers/SERVER01/auto-update', data={'enabled': '0'}, headers=ajax)
+    assert Server.query.one().auto_update is False and _hb(app).get_json()['settings']['SERVER01']['auto_update'] is False
+    for url in ['/admin/', '/admin/servers/', '/admin/servers/SERVER01', '/admin/servers/SERVER01/players', '/admin/servers/SERVER01/match',
+                '/admin/servers/SERVER01/chat', '/admin/servers/SERVER01/backups', '/admin/servers/SERVER01/logs', '/admin/jogadores', '/admin/seguranca']:
+        assert c.get(url).status_code == 200, url
+
+
+def test_toggle_admin_needs_pin(app):
+    admin = user(admin=True); other = user(); c = client_as(app, admin)
+    db.session.add(AdminSetting(key='admin_action_pin_hash', value=generate_password_hash('1234'))); db.session.commit()
+    ajax = {'X-Requested-With': 'XMLHttpRequest'}
+    assert c.post(f'/admin/jogadores/{other.id}/admin', data={'pin': '9999'}, headers=ajax).status_code == 403
+    assert c.post(f'/admin/jogadores/{other.id}/admin', data={'pin': '1234'}, headers=ajax).get_json()['ok']
+    assert db.session.get(User, other.id).is_admin
+    assert b'Remover admin' in c.get('/admin/jogadores').data
+    assert client_as(app, other).get('/admin/').status_code == 200
+
+
+def test_agent_auto_update_rules():
+    from agent.cs2 import CS2Process
+    p = CS2Process({'exe': 'C:/x/runtime/server01/game/bin/win64/cs2.exe', 'args': []}, {'auto_update': True})
+    assert p.install_dir.replace('\\', '/').endswith('runtime/server01')
+    started = []
+    p.start_update = lambda trigger='manual': started.append(trigger)
+    p.version['up_to_date'] = False
+    assert not p.maybe_auto_update(player_count=3, busy=False)   # com gente jogando não atualiza
+    assert not p.maybe_auto_update(player_count=0, busy=True)    # partida em andamento não atualiza
+    assert p.maybe_auto_update(player_count=0, busy=False) and started == ['auto']
+    p.auto_update = False; assert not p.maybe_auto_update(0, False)
+
+
 # ---------------- Admin ----------------
 
 def test_admin_full_day_flow(app):

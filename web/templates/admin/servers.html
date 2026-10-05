@@ -1,0 +1,36 @@
+{% extends 'admin_base.html' %}
+{% block title %}Servidores · Admin PLAY4LAN{% endblock %}
+{% block top_title %}Servidores{% endblock %}
+{% block content %}
+<div class="admin-page" id="admin-dashboard">
+  <section class="admin-hero">
+    <div><span class="eyebrow"><i class="bi bi-hdd-rack"></i> INFRAESTRUTURA</span><h1>Servidores</h1><p>Status em tempo real, versão do CS2 e atualização. Os servidores aparecem aqui quando o Agent do PC da LAN manda o primeiro sinal.</p></div>
+  </section>
+  {% for s in servers %}{% set snap = snaps[s.code] %}{% set tel = snap.telemetry %}
+  <article class="srv-card" data-server-code="{{ s.code }}">
+    <div class="srv-head">
+      <a href="/admin/servers/{{ s.code }}"><span class="server-icon"><i class="bi bi-hdd-rack"></i></span><div><small>{{ s.code }} · {{ s.host_id or '—' }}{% if s.agent_version %} · Agent {{ s.agent_version }}{% endif %}</small><h3>{{ s.display_name or s.code }}</h3></div></a>
+      <span class="status-badge {{ snap.status|lower }}" data-role="status"><span></span>{{ snap.status_label }}</span>
+    </div>
+    <div class="srv-meta">
+      <span><i class="bi bi-map"></i> <b data-role="map">{{ tel.get('map') or '—' }}</b></span>
+      <span><i class="bi bi-people"></i> <b data-role="players">{{ tel.get('player_count', 0) }}/10</b></span>
+      <span><i class="bi bi-terminal"></i> RCON <b data-role="rcon">{{ 'OK' if tel.get('rcon_ok') else '—' }}</b></span>
+      <span><i class="bi bi-box-seam"></i> CS2 <b>{{ s.installed_version or '—' }}</b></span>
+      <span>{% if s.update_state == 'RUNNING' %}<span class="soft-badge pending"><i class="bi bi-arrow-repeat"></i> Atualizando</span>{% elif s.needs_update %}<span class="soft-badge pending"><i class="bi bi-arrow-up-circle-fill"></i> {{ s.required_version }} disponível</span>{% elif s.up_to_date %}<span class="soft-badge approved">Atualizado</span>{% endif %}</span>
+      <span><i class="bi bi-magic"></i> Auto-update <b>{{ 'ligado' if s.auto_update is not false else 'desligado' }}</b></span>
+      <span><i class="bi bi-heart-pulse"></i> Último sinal <b>{{ s.last_heartbeat.strftime('%d/%m %H:%M:%S') ~ ' UTC' if s.last_heartbeat else 'nunca' }}</b></span>
+    </div>
+    <div class="srv-actions">
+      <form class="js-async-form js-secure-form" data-action-label="Ligar {{ s.code }}" method="post" action="/admin/servers/{{ s.code }}/START"><button class="button good small"><i class="bi bi-play-fill"></i> Ligar</button></form>
+      <form class="js-async-form js-secure-form" data-action-label="Reiniciar {{ s.code }}" method="post" action="/admin/servers/{{ s.code }}/RESTART"><button class="button ghost small"><i class="bi bi-arrow-clockwise"></i> Reiniciar</button></form>
+      <form class="js-async-form js-secure-form" data-action-label="Desligar {{ s.code }}" method="post" action="/admin/servers/{{ s.code }}/STOP"><button class="button ghost small"><i class="bi bi-stop-fill"></i> Desligar</button></form>
+      {% if s.needs_update %}<form class="js-async-form js-secure-form" data-action-label="Atualizar o CS2 do {{ s.code }}" data-confirm="O servidor será desligado, atualizado e ligado de novo. Continuar?" method="post" action="/admin/servers/{{ s.code }}/UPDATE"><button class="button small"><i class="bi bi-cloud-arrow-down"></i> Atualizar CS2</button></form>{% endif %}
+      <a class="button secondary small" href="/admin/servers/{{ s.code }}"><i class="bi bi-sliders"></i> Gerenciar</a>
+    </div>
+  </article>
+  {% else %}
+  <div class="empty-card"><i class="bi bi-cloud-slash"></i><h3>Nenhum servidor ainda</h3><p>No PC da LAN, rode scripts\run_agent_windows.bat. O Agent lê agent\config.json e registra os servidores aqui.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,4 +1,21 @@
-<div class="server-topbar" id="server-admin" data-server-code="{{ server.code }}"><div><a href="{{ url_for('admin.dashboard') }}" class="back-link"><i class="bi bi-arrow-left"></i> Central</a><div class="server-title-line"><span class="server-icon large"><i class="bi bi-server"></i></span><div><span class="eyebrow">{{ server.code }}</span><h1>{{ server.display_name or server.code }}</h1></div></div></div><div class="server-top-status"><span class="phase-pill" data-role="phase">{{ telemetry.get('phase','AGUARDANDO') }}</span><span class="status-badge large {{ server.status|lower }}" data-role="server-status"><span></span>{{ server.status }}</span></div></div>
+{% set st = server.live_status %}
+<div class="server-topbar" id="server-admin" data-server-code="{{ server.code }}">
+  <div>
+    <a href="{{ url_for('admin.servers_list') }}" class="back-link"><i class="bi bi-arrow-left"></i> Servidores</a>
+    <div class="server-title-line"><span class="server-icon large"><i class="bi bi-hdd-rack"></i></span>
+      <div><span class="eyebrow">{{ server.code }} · {{ server.host_id or 'sem host' }}{% if server.installed_version %} · CS2 {{ server.installed_version }}{% endif %}</span><h1>{{ server.display_name or server.code }}</h1></div>
+    </div>
+  </div>
+  <div class="server-top-status">
+    {% if server.needs_update %}<a class="soft-badge pending" href="{{ url_for('admin.server_detail', code=server.code) }}#versao"><i class="bi bi-arrow-up-circle-fill"></i> Atualização disponível</a>{% endif %}
+    {% if current_match %}<a class="phase-pill" href="/admin/tournaments/partidas/{{ current_match.id }}"><i class="bi bi-controller"></i> {{ current_match.team1.tag if current_match.team1 else '?' }} vs {{ current_match.team2.tag if current_match.team2 else '?' }}</a>{% endif %}
+    <span class="phase-pill" data-role="phase">{{ telemetry.get('phase','AGUARDANDO') }}</span>
+    <span class="status-badge large {{ st|lower }}" data-role="server-status"><span></span>{{ st|label }}</span>
+  </div>
+</div>
+{% if st == 'NO_SIGNAL' %}
+<div class="notice"><i class="bi bi-plug"></i><div><b>O Agent deste servidor está sem sinal</b><span>Último sinal: {{ server.last_heartbeat.strftime('%d/%m %H:%M:%S') ~ ' (UTC)' if server.last_heartbeat else 'nunca' }}. Abra o Agent no PC da LAN (scripts\run_agent_windows.bat). Enquanto isso, nenhum comando chega ao servidor.</span></div></div>
+{% endif %}
 <nav class="server-tabs">
 <a class="{{ 'active' if request.endpoint=='admin.server_detail' else '' }}" href="{{ url_for('admin.server_detail',code=server.code) }}"><i class="bi bi-speedometer2"></i> Visão geral</a>
 <a class="{{ 'active' if request.endpoint=='admin.server_players' else '' }}" href="{{ url_for('admin.server_players',code=server.code) }}"><i class="bi bi-people-fill"></i> Jogadores</a>
@@ -6,5 +23,4 @@
 <a class="{{ 'active' if request.endpoint=='admin.server_chat' else '' }}" href="{{ url_for('admin.server_chat',code=server.code) }}"><i class="bi bi-chat-left-text-fill"></i> Chat</a>
 <a class="{{ 'active' if request.endpoint=='admin.server_backups' else '' }}" href="{{ url_for('admin.server_backups',code=server.code) }}"><i class="bi bi-clock-history"></i> Backups</a>
 <a class="{{ 'active' if request.endpoint=='admin.server_logs' else '' }}" href="{{ url_for('admin.server_logs',code=server.code) }}"><i class="bi bi-journal-text"></i> Logs</a>
-<a class="{{ 'active' if request.endpoint=='admin.server_security' else '' }}" href="{{ url_for('admin.server_security',code=server.code) }}"><i class="bi bi-shield-lock-fill"></i> Segurança</a>
 </nav>

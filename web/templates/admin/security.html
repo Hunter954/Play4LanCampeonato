@@ -1,0 +1,26 @@
+{% extends 'admin_base.html' %}
+{% block title %}Segurança · Admin PLAY4LAN{% endblock %}
+{% block top_title %}Segurança{% endblock %}
+{% block content %}
+<div class="admin-page">
+  <section class="admin-hero">
+    <div><span class="eyebrow"><i class="bi bi-shield-lock"></i> CONFIGURAÇÕES</span><h1>Segurança e PIN</h1><p>O PIN de 4 dígitos protege tudo que mexe nos servidores: ligar, desligar, atualizar, RCON, enviar partida e dar acesso de admin.</p></div>
+  </section>
+  <div class="security-grid">
+    <section class="admin-panel">
+      <span class="security-shield"><i class="bi bi-shield-lock-fill"></i></span>
+      <h2>Como funciona</h2>
+      <p class="muted">O PIN fica guardado com hash e nunca aparece no painel. O padrão de fábrica é <b>0800</b>: troque antes do evento.</p>
+      <div class="security-note"><i class="bi bi-person-badge"></i><span>Para dar acesso ao painel a outra pessoa, use <a href="/admin/jogadores" style="color:#ff7a1a">Jogadores → Tornar admin</a>. Ela entra com a própria Steam.</span></div>
+    </section>
+    <section class="admin-panel">
+      <div class="panel-heading"><div><span class="section-kicker">ALTERAR PIN</span><h2>Novo código</h2></div></div>
+      <form class="js-async-form js-secure-form" data-action-label="Alterar o PIN de operação (digite o PIN ATUAL)" method="post" action="/admin/seguranca/pin">
+        <label>Novo PIN<input name="new_pin" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" required></label>
+        <label>Confirmar novo PIN<input name="confirm_pin" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" required></label>
+        <button class="button"><i class="bi bi-shield-check"></i> Salvar novo PIN</button>
+      </form>
+    </section>
+  </div>
+</div>
+{% endblock %}
