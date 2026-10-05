@@ -187,6 +187,13 @@ class Incident(db.Model):
     id=db.Column(db.Integer, primary_key=True); match_id=db.Column(db.Integer, db.ForeignKey('match.id')); description=db.Column(db.Text, nullable=False); created_at=db.Column(db.DateTime, default=now)
 
 
+class MediaFile(db.Model):
+    """Imagens enviadas (avatar/logo). Ficam no banco porque o disco do Railway é apagado a cada deploy."""
+    id=db.Column(db.Integer, primary_key=True); kind=db.Column(db.String(20), nullable=False)
+    content_type=db.Column(db.String(40), nullable=False, default='image/webp'); data=db.Column(db.LargeBinary, nullable=False)
+    size=db.Column(db.Integer); owner_id=db.Column(db.Integer, db.ForeignKey('user.id')); created_at=db.Column(db.DateTime, default=now)
+
+
 class AdminSetting(db.Model):
     id=db.Column(db.Integer, primary_key=True)
     key=db.Column(db.String(100), unique=True, nullable=False, index=True)

@@ -308,6 +308,15 @@ a.list-row:hover b{color:var(--accent)}
 .field-row:has(.tag-field){grid-template-columns:1fr 130px}
 .tag-field input{text-transform:uppercase;font-weight:700;letter-spacing:.08em}
 .form-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.upload{display:flex;align-items:center;gap:16px;padding:14px;border:1px dashed var(--line2);border-radius:var(--r-lg);background:var(--bg2)}
+.upload-preview{display:grid;place-items:center;flex:0 0 auto;width:76px;height:76px;border-radius:10px;background:var(--surface2);color:var(--dim);font-size:28px;overflow:hidden}
+.upload-body{display:grid;gap:6px;min-width:0}
+.upload-body>b{font-size:14px}
+.upload-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:4px}
+.upload-actions .btn{cursor:pointer}
+.upload-name{color:var(--accent);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.check{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;cursor:pointer}
+.check input{width:auto;accent-color:var(--accent)}
 .form-layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;align-items:start;max-width:980px;margin:0 auto}
 .form-aside{display:flex;flex-direction:column;align-items:center;gap:10px;padding:28px 20px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);text-align:center;position:sticky;top:84px}
 .form-aside h2{font-size:22px;margin-top:6px}

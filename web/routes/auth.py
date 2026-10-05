@@ -7,6 +7,7 @@ from flask_login import login_user, logout_user, current_user, login_required
 from werkzeug.security import check_password_hash
 from web.extensions import db
 from web.models import User
+from web import media
 bp=Blueprint('auth',__name__,url_prefix='/auth')
 
 def safe_next(value):
@@ -89,19 +90,23 @@ def profile():
         f=request.form
         nickname=(f.get('nickname') or '').strip()[:80]; real_name=(f.get('real_name') or '').strip()[:255]
         whatsapp=re.sub(r'[^\d+() -]','',f.get('whatsapp') or '').strip()[:32]
-        avatar=(f.get('avatar_url') or '').strip()[:500]
         errors=[]
         if len(nickname)<2: errors.append('Escolha um nick com pelo menos 2 caracteres.')
         if len(real_name.split())<2: errors.append('Informe seu nome e sobrenome.')
-        if avatar and not avatar.startswith('https://'): errors.append('O avatar precisa ser um link https://.')
         taken=User.query.filter(db.func.lower(User.nickname)==nickname.lower(), User.id!=current_user.id).first() if nickname else None
         if taken: errors.append('Esse nick já está em uso na plataforma.')
+        upload=request.files.get('avatar'); new_avatar=None
+        if not errors and upload and upload.filename:
+            try: new_avatar=media.save_image(upload,'avatar',current_user.id)
+            except ValueError as e: errors.append(str(e))
         if errors:
+            db.session.rollback()
             for e in errors: flash(e,'danger')
             return render_template('profile.html', first_time=first_time, next=nxt, form=f), 400
         current_user.nickname=nickname; current_user.real_name=real_name; current_user.whatsapp=whatsapp or None
         current_user.city=(f.get('city') or '').strip()[:80] or None; current_user.bio=(f.get('bio') or '').strip()[:280] or None
-        current_user.avatar_url=avatar or None
+        if new_avatar or f.get('remove_avatar')=='1':
+            media.delete_if_local(current_user.avatar_url); current_user.avatar_url=new_avatar
         if not current_user.onboarded_at: current_user.onboarded_at=datetime.utcnow()
         db.session.commit()
         flash('Cadastro concluído! Agora monte seu time.' if first_time else 'Perfil atualizado.','success')

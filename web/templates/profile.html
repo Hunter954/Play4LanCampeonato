@@ -15,7 +15,7 @@
     <span class="kicker">{{ 'Passo 2 de 4' if first_time else 'Minha conta' }}</span>
     <h1>{{ 'Complete seu cadastro' if first_time else 'Editar cadastro' }}</h1>
     <p class="muted">Seu <b>nome real</b> e <b>WhatsApp</b> ficam visíveis apenas para a organização, para o check-in no dia do evento.</p>
-    <form method="post" action="/auth/profile{{ '?next=' ~ (next|urlencode) if next }}" class="form">
+    <form method="post" action="/auth/profile{{ '?next=' ~ (next|urlencode) if next }}" class="form" enctype="multipart/form-data">
       <div class="field-row">
         <label class="field"><span>Nick *</span><input name="nickname" maxlength="80" required value="{{ f.get('nickname') or current_user.nickname or current_user.steam_name or '' }}" placeholder="Como você aparece no site"></label>
         <label class="field"><span>Nome completo *</span><input name="real_name" maxlength="255" required value="{{ f.get('real_name') or current_user.real_name or '' }}" placeholder="Nome e sobrenome"></label>
@@ -25,7 +25,18 @@
         <label class="field"><span>Cidade</span><input name="city" maxlength="80" value="{{ f.get('city') or current_user.city or '' }}" placeholder="Foz do Iguaçu"></label>
       </div>
       <label class="field"><span>Sobre você <small>(opcional, aparece no seu perfil)</small></span><textarea name="bio" maxlength="280" rows="3" placeholder="Função no time, mapas favoritos...">{{ f.get('bio') or current_user.bio or '' }}</textarea></label>
-      <label class="field"><span>Avatar personalizado <small>(opcional, link https; vazio = avatar da Steam)</small></span><input name="avatar_url" type="url" maxlength="500" value="{{ f.get('avatar_url') or current_user.avatar_url or '' }}" placeholder="https://..."></label>
+      <div class="upload" data-upload>
+        <div class="upload-preview avatar-shape">{{ avatar(current_user, 'lg') }}<img class="avatar avatar-lg" data-upload-img alt="" hidden></div>
+        <div class="upload-body">
+          <b>Foto de perfil <small class="muted">(opcional)</small></b>
+          <small class="muted">JPG, PNG, WEBP ou GIF até 5 MB. Sem foto, usamos a da sua Steam.</small>
+          <div class="upload-actions">
+            <label class="btn btn-ghost btn-sm"><i class="bi bi-upload"></i> Escolher imagem<input type="file" name="avatar" accept="image/png,image/jpeg,image/webp,image/gif" data-upload-input hidden></label>
+            {% if current_user.avatar_url %}<label class="check"><input type="checkbox" name="remove_avatar" value="1"> Voltar para a foto da Steam</label>{% endif %}
+          </div>
+          <small class="upload-name" data-upload-name></small>
+        </div>
+      </div>
       <div class="form-actions"><button class="btn btn-primary btn-lg" type="submit"><i class="bi bi-check2-circle"></i> {{ 'Concluir cadastro' if first_time else 'Salvar alterações' }}</button>{% if not first_time %}<a class="btn btn-ghost btn-lg" href="/conta">Cancelar</a>{% endif %}</div>
     </form>
   </section>

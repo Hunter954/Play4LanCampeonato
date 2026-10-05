@@ -147,6 +147,24 @@
     setInterval(poll, 3000);
   }
 
+  // Envio de imagem: valida no navegador e mostra a prévia antes de enviar
+  const MAX_UPLOAD = 5 * 1024 * 1024;
+  $$('[data-upload]').forEach(box => {
+    const input = $('[data-upload-input]', box), img = $('[data-upload-img]', box), name = $('[data-upload-name]', box);
+    input?.addEventListener('change', () => {
+      const file = input.files[0];
+      if (!file) return;
+      if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) { alert('Envie uma imagem JPG, PNG, WEBP ou GIF.'); input.value = ''; return; }
+      if (file.size > MAX_UPLOAD) { alert('A imagem pode ter no máximo 5 MB.'); input.value = ''; return; }
+      if (name) name.textContent = `${file.name} · ${(file.size / 1024).toFixed(0)} KB`;
+      if (img) {
+        img.src = URL.createObjectURL(file); img.hidden = false;
+        img.previousElementSibling?.setAttribute('hidden', '');
+      }
+      input.dispatchEvent(new Event('preview'));
+    });
+  });
+
   // Prévia ao vivo do time no formulário
   const form = $('[data-team-form]');
   const preview = $('[data-team-preview]');
@@ -154,17 +172,22 @@
     const nameEl = $('[data-preview-name]', preview), tagEl = $('[data-preview-tag]', preview);
     const logoImg = $('[data-preview-logo]', preview), logoEmpty = $('[data-preview-logo-empty]', preview);
     const input = key => $(`[data-preview-input="${key}"]`, form);
+    const remove = $('[data-remove-logo]', form);
+    const original = logoImg.getAttribute('src');
     const render = () => {
-      const name = input('name').value.trim(), tag = input('tag').value.trim().toUpperCase(), logo = input('logo').value.trim();
+      const name = input('name').value.trim(), tag = input('tag').value.trim().toUpperCase();
       nameEl.textContent = name || 'Nome do time';
       tagEl.textContent = tag || 'TAG';
       logoEmpty.textContent = tag || 'TAG';
-      const valid = /^https:\/\/\S+$/.test(logo);
-      logoImg.hidden = !valid; logoEmpty.hidden = valid;
-      if (valid && logoImg.src !== logo) logoImg.src = logo;
+      const file = input('logo').files[0];
+      let src = file ? URL.createObjectURL(file) : (remove?.checked ? null : original);
+      logoImg.hidden = !src; logoEmpty.hidden = !!src;
+      if (src) logoImg.src = src;
     };
     logoImg.addEventListener('error', () => { logoImg.hidden = true; logoEmpty.hidden = false; });
-    $$('[data-preview-input]', form).forEach(el => el.addEventListener('input', render));
+    ['name', 'tag'].forEach(k => input(k).addEventListener('input', render));
+    input('logo').addEventListener('preview', render);
+    remove?.addEventListener('change', render);
     render();
   }
 })();

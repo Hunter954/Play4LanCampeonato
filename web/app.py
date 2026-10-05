@@ -80,6 +80,8 @@ def create_app():
     app.register_blueprint(main_bp); app.register_blueprint(auth_bp); app.register_blueprint(teams_bp)
     app.register_blueprint(tournaments_bp); app.register_blueprint(admin_bp); app.register_blueprint(api_bp)
     app.register_blueprint(matches_bp); app.register_blueprint(admin_t_bp)
+    from web.media import bp as media_bp
+    app.register_blueprint(media_bp)
 
     with app.app_context():
         db.create_all(); _ensure_columns()

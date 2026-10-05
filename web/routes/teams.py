@@ -4,6 +4,7 @@ from flask_login import login_required, current_user
 from web.extensions import db
 from web.models import Team, TeamMember, Invite, TournamentRegistration, Match, Payment, ROSTER_SIZE, ACTIVE_REG_STATUSES
 from web.routes.auth import onboarded_required
+from web import media
 bp=Blueprint('teams',__name__,url_prefix='/teams')
 
 TAG_RE=re.compile(r'^[A-Za-z0-9]{2,5}$')
@@ -19,15 +20,20 @@ def _active_registrations(team):
     return TournamentRegistration.query.filter(TournamentRegistration.team_id==team.id, TournamentRegistration.status.in_(ACTIVE_REG_STATUSES)).count()
 
 def _validate_team_form(f, team=None):
-    name=(f.get('name') or '').strip()[:40]; tag=(f.get('tag') or '').strip().upper(); logo=(f.get('logo_url') or '').strip()[:500]
+    name=(f.get('name') or '').strip()[:40]; tag=(f.get('tag') or '').strip().upper()
     errors=[]
     if len(name)<3: errors.append('O nome do time precisa ter pelo menos 3 caracteres.')
     if not TAG_RE.match(tag): errors.append('A tag precisa ter de 2 a 5 letras ou números, sem espaços.')
-    if logo and not logo.startswith('https://'): errors.append('O logo precisa ser um link https://.')
     q=Team.query.filter(Team.id!=team.id) if team else Team.query
     if name and q.filter(db.func.lower(Team.name)==name.lower()).first(): errors.append('Já existe um time com esse nome.')
     if tag and q.filter(db.func.upper(Team.tag)==tag).first(): errors.append('Essa tag já está em uso por outro time.')
-    return {'name':name,'tag':tag,'logo_url':logo or None,'description':(f.get('description') or '').strip()[:280] or None}, errors
+    data={'name':name,'tag':tag,'description':(f.get('description') or '').strip()[:280] or None}
+    upload=request.files.get('logo')
+    if not errors and upload and upload.filename:
+        try: data['logo_url']=media.save_image(upload,'logo',current_user.id)
+        except ValueError as e: errors.append(str(e))
+    elif f.get('remove_logo')=='1': data['logo_url']=None
+    return data, errors
 
 @bp.get('/')
 def index():
@@ -42,6 +48,7 @@ def create():
     if request.method=='POST':
         data,errors=_validate_team_form(request.form)
         if errors:
+            db.session.rollback()
             for e in errors: flash(e,'danger')
             return render_template('teams/create.html',form=request.form,team=None),400
         t=Team(owner_id=current_user.id,**data); db.session.add(t); db.session.flush()
@@ -59,8 +66,10 @@ def edit(team_id):
     if request.method=='POST':
         data,errors=_validate_team_form(request.form,t)
         if errors:
+            db.session.rollback()
             for e in errors: flash(e,'danger')
             return render_template('teams/create.html',form=request.form,team=t),400
+        if 'logo_url' in data: media.delete_if_local(t.logo_url)
         for k,v in data.items(): setattr(t,k,v)
         db.session.commit(); flash('Time atualizado.','success'); return redirect(url_for('teams.detail',team_id=t.id))
     return render_template('teams/create.html',form=t.__dict__,team=t)
@@ -144,5 +153,6 @@ def delete(team_id):
     reg_ids=[r.id for r in TournamentRegistration.query.filter_by(team_id=t.id).all()]
     if reg_ids: Payment.query.filter(Payment.registration_id.in_(reg_ids)).delete(synchronize_session=False)
     TournamentRegistration.query.filter_by(team_id=t.id).delete(); Invite.query.filter_by(team_id=t.id).delete()
+    media.delete_if_local(t.logo_url)
     name=t.name; db.session.delete(t); db.session.commit()
     flash(f'O time {name} foi excluído.','info'); return redirect(url_for('main.account'))

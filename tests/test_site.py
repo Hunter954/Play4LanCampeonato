@@ -134,6 +134,36 @@ def test_account_and_player_pages(app):
         assert c.get(url).status_code==200, url
 
 
+def _png(w=600, h=400, color=(255, 120, 20, 255)):
+    import io
+    from PIL import Image
+    buf = io.BytesIO(); Image.new('RGBA', (w, h), color).save(buf, 'PNG'); buf.seek(0); return buf
+
+
+def test_avatar_and_logo_upload(app):
+    import io
+    from PIL import Image
+    from web.models import MediaFile
+    u=make_user(1); c=client_as(app,u)
+    r=c.post('/auth/profile', data={'nickname':'Fulano','real_name':'Fulano de Tal','avatar':(_png(),'eu.png')}, content_type='multipart/form-data')
+    assert r.status_code==302
+    url=db.session.get(User,u.id).avatar_url; assert url.startswith('/media/') and url.endswith('.webp')
+    img=Image.open(io.BytesIO(c.get(url).data)); assert img.format=='WEBP' and img.size==(256,256)
+    # arquivo que não é imagem é recusado e o avatar antigo continua
+    r=c.post('/auth/profile', data={'nickname':'Fulano','real_name':'Fulano de Tal','avatar':(io.BytesIO(b'<script>alert(1)</script>'),'x.png')}, content_type='multipart/form-data')
+    assert r.status_code==400 and db.session.get(User,u.id).avatar_url==url
+    # trocar a foto apaga a anterior; remover volta para a da Steam
+    c.post('/auth/profile', data={'nickname':'Fulano','real_name':'Fulano de Tal','avatar':(_png(color=(0,0,255,255)),'b.png')}, content_type='multipart/form-data')
+    assert c.get(url).status_code==404 and MediaFile.query.count()==1
+    c.post('/auth/profile', data={'nickname':'Fulano','real_name':'Fulano de Tal','remove_avatar':'1'}, content_type='multipart/form-data')
+    assert db.session.get(User,u.id).avatar_url is None and MediaFile.query.count()==0
+    # logo do time
+    c.post('/teams/create', data={'name':'Time Logo','tag':'TLG','logo':(_png(800,300),'logo.png')}, content_type='multipart/form-data')
+    team=Team.query.one(); assert team.logo_url.startswith('/media/')
+    logo=Image.open(io.BytesIO(c.get(team.logo_url).data)); assert logo.size==(256,256) and logo.mode=='RGBA'
+    c.post(f'/teams/{team.id}/delete'); assert MediaFile.query.count()==0
+
+
 def test_adds_missing_columns_to_existing_database(tmp_path):
     os.environ['DATABASE_URL']=f'sqlite:///{tmp_path}/old.db'
     try:
