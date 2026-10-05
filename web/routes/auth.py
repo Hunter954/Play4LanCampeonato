@@ -49,7 +49,10 @@ def logout(): logout_user(); flash('Você saiu da sua conta.','info'); return re
 @bp.get('/steam')
 def steam_login():
     return_to=url_for('auth.steam_callback',_external=True)
-    params={'openid.ns':'http://specs.openid.net/auth/2.0','openid.mode':'checkid_setup','openid.return_to':return_to,'openid.realm':os.getenv('STEAM_REALM',request.host_url.rstrip('/')),'openid.identity':'http://specs.openid.net/auth/2.0/identifier_select','openid.claimed_id':'http://specs.openid.net/auth/2.0/identifier_select'}
+    # A Steam exige que return_to esteja dentro do realm; um STEAM_REALM de outro domínio quebraria o login.
+    realm=(os.getenv('STEAM_REALM') or '').rstrip('/')
+    if not realm or not return_to.startswith(realm+'/'): realm=request.host_url.rstrip('/')
+    params={'openid.ns':'http://specs.openid.net/auth/2.0','openid.mode':'checkid_setup','openid.return_to':return_to,'openid.realm':realm,'openid.identity':'http://specs.openid.net/auth/2.0/identifier_select','openid.claimed_id':'http://specs.openid.net/auth/2.0/identifier_select'}
     session['post_steam_next']=safe_next(request.args.get('next'))
     return redirect('https://steamcommunity.com/openid/login?'+urlencode(params))
 

@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from flask import Flask
 from dotenv import load_dotenv
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash
 from web.extensions import db, login_manager, socketio
 
@@ -32,6 +33,8 @@ def _ensure_columns():
 
 def create_app():
     app = Flask(__name__, template_folder="templates", static_folder="static")
+    # Railway termina o HTTPS no proxy; sem isso os links externos (login Steam, convites) saem como http://
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev")
     db_url = os.getenv("DATABASE_URL", "sqlite:///dev.db")
     if db_url.startswith("postgres://"):

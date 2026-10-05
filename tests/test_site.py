@@ -59,6 +59,18 @@ def test_steam_next_rejects_external_urls(app):
         with c.session_transaction() as s: assert s.get('post_steam_next') is None
 
 
+def test_steam_login_behind_railway_proxy_uses_https_and_matching_realm(app, monkeypatch):
+    from urllib.parse import urlparse, parse_qs
+    monkeypatch.setenv('STEAM_REALM','https://camp.play4lan.com.br')  # domínio diferente do acessado
+    r=app.test_client().get('/auth/steam', headers={'X-Forwarded-Proto':'https','X-Forwarded-Host':'web-production-9c99d.up.railway.app'})
+    q=parse_qs(urlparse(r.location).query)
+    assert q['openid.return_to']==['https://web-production-9c99d.up.railway.app/auth/steam/callback']
+    assert q['openid.realm']==['https://web-production-9c99d.up.railway.app']
+    monkeypatch.setenv('STEAM_REALM','https://web-production-9c99d.up.railway.app')
+    r=app.test_client().get('/auth/steam', headers={'X-Forwarded-Proto':'https','X-Forwarded-Host':'web-production-9c99d.up.railway.app'})
+    assert parse_qs(urlparse(r.location).query)['openid.realm']==['https://web-production-9c99d.up.railway.app']
+
+
 def test_onboarding_required_and_profile_validation(app):
     u=make_user(1, onboarded=False); c=client_as(app,u)
     assert '/auth/profile' in c.get('/teams/create').location
