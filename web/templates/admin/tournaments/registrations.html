@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}Inscrições · {{ t.name }} · Admin{% endblock %}
+{% block content %}
+<div class="admin-page">
+  {% include 'admin/tournaments/_nav.html' %}
+  {% if not mp_enabled and t.entry_fee_cents %}
+  <div class="notice"><i class="bi bi-exclamation-triangle"></i><div><b>Mercado Pago não configurado</b><span>Os times não conseguem pagar online. Configure MP_ACCESS_TOKEN no Railway ou confirme pagamentos manualmente aqui.</span></div></div>
+  {% endif %}
+
+  <div class="match-status-strip">
+    <div><span>Confirmados</span><b>{{ regs|selectattr('status','equalto','APPROVED')|list|length }}/{{ t.max_teams }}</b></div>
+    <div><span>Aguardando pagamento</span><b>{{ regs|selectattr('status','equalto','AWAITING_PAYMENT')|list|length }}</b></div>
+    <div><span>Para revisar</span><b>{{ regs|selectattr('status','in',['PAYMENT_REVIEW','PENDING'])|list|length }}</b></div>
+    <div><span>Vagas livres</span><b>{{ slots_left }}</b></div>
+  </div>
+
+  <section class="admin-panel">
+    <div class="panel-heading"><div><span class="section-kicker">TIMES</span><h2>Inscrições</h2></div></div>
+    <div class="table-scroll">
+    <table class="admin-table">
+      <thead><tr><th>Seed</th><th>Time</th><th>Capitão</th><th>Elenco</th><th>Status</th><th>Pagamento</th><th></th></tr></thead>
+      <tbody>
+      {% for r in regs %}{% set p = r.latest_payment %}{% set cap = r.team.owner %}
+      <tr class="{{ 'dim' if r.status in ['REJECTED','CANCELLED'] }}">
+        <td><form class="js-async-form seed-form" method="post" action="/admin/tournaments/{{ t.id }}/inscricoes/{{ r.id }}/seed"><input name="seed" value="{{ r.seed or '' }}" inputmode="numeric" maxlength="2"><button class="icon-button" title="Salvar seed"><i class="bi bi-check"></i></button></form></td>
+        <td><a href="/teams/{{ r.team_id }}" target="_blank"><b>{{ r.team.name }}</b></a><br><small class="muted">{{ r.team.tag }} · {{ r.team.members|length }}/{{ roster_size }}</small></td>
+        <td>{{ cap.display_name }}<br><small class="muted">{{ cap.real_name or '' }}</small>{% if cap.whatsapp %}<br><a class="wa" href="https://wa.me/55{{ cap.whatsapp|replace(' ','')|replace('(','')|replace(')','')|replace('-','')|replace('+55','') }}" target="_blank"><i class="bi bi-whatsapp"></i> {{ cap.whatsapp }}</a>{% endif %}</td>
+        <td><div class="roster-cell">{% for m in r.team.roster %}<span title="{{ m.user.real_name or '' }} · {{ m.user.steam_id64 }}">{{ m.user.display_name }}{% if not m.user.is_onboarded %} <i class="bi bi-exclamation-triangle-fill warn" title="Cadastro incompleto"></i>{% endif %}</span>{% endfor %}</div></td>
+        <td><span class="soft-badge {{ 'approved' if r.status == 'APPROVED' else 'rejected' if r.status in ['REJECTED','CANCELLED'] else 'pending' }}">{{ r.status|label }}</span>{% if r.admin_note %}<br><small class="muted">{{ r.admin_note }}</small>{% endif %}</td>
+        <td>{% if p %}<small>{{ 'Mercado Pago' if p.provider == 'mercadopago' else 'Manual' }} · {{ {'approved':'aprovado','pending':'pendente','in_process':'em processamento','rejected':'recusado','cancelled':'cancelado','refunded':'estornado','expired':'expirado'}.get(p.status, p.status) }}{% if p.provider_payment_id %}<br>#{{ p.provider_payment_id }}{% endif %}{% if p.paid_at %}<br>Pago {{ p.paid_at.strftime('%d/%m %H:%M') }}{% endif %}{% if p.note %}<br>{{ p.note }}{% endif %}</small>{% else %}<small class="muted">—</small>{% endif %}</td>
+        <td class="row-actions">
+          {% if r.status in ['AWAITING_PAYMENT'] %}
+            {% if p and p.provider == 'mercadopago' %}<form class="js-async-form" method="post" action="/admin/tournaments/{{ t.id }}/inscricoes/{{ r.id }}/sync"><button class="icon-button" title="Consultar Mercado Pago"><i class="bi bi-arrow-repeat"></i></button></form>{% endif %}
+            <form class="js-async-form" method="post" action="/admin/tournaments/{{ t.id }}/inscricoes/{{ r.id }}/confirm" data-confirm="Confirmar pagamento recebido por fora (dinheiro/Pix direto)?"><input type="hidden" name="note" value="Pago no balcão"><button class="icon-button good" title="Confirmar pagamento manual"><i class="bi bi-cash-coin"></i></button></form>
+          {% endif %}
+          {% if r.status in ['PAYMENT_REVIEW','PENDING'] %}<form class="js-async-form" method="post" action="/admin/tournaments/{{ t.id }}/inscricoes/{{ r.id }}/approve"><button class="icon-button good" title="Confirmar vaga"><i class="bi bi-check-lg"></i></button></form>{% endif %}
+          {% if r.status not in ['REJECTED','CANCELLED'] %}<form class="js-async-form" method="post" action="/admin/tournaments/{{ t.id }}/inscricoes/{{ r.id }}/cancel"><button class="icon-button danger" title="Cancelar inscrição"><i class="bi bi-x-lg"></i></button></form>{% endif %}
+        </td>
+      </tr>
+      {% else %}<tr><td colspan="7" class="muted">Nenhuma inscrição ainda. Divulgue a página pública do campeonato.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  {% set confirmed = regs|selectattr('status','equalto','APPROVED')|list %}
+  {% if confirmed %}
+  <details class="admin-panel advanced-console">
+    <summary><span><i class="bi bi-clipboard-check"></i><b>Lista de check-in</b><small>{{ confirmed|length * roster_size }} jogadores · nome real, SteamID e WhatsApp</small></span><i class="bi bi-chevron-down"></i></summary>
+    <div class="advanced-console-body table-scroll">
+      <table class="admin-table"><thead><tr><th>Time</th><th>Nick</th><th>Nome</th><th>SteamID64</th><th>WhatsApp</th><th>Check-in</th></tr></thead><tbody>
+      {% for r in confirmed %}{% for m in r.team.roster %}<tr><td>{{ r.team.tag }}</td><td>{{ m.user.display_name }}</td><td>{{ m.user.real_name or '—' }}</td><td><code>{{ m.user.steam_id64 }}</code></td><td>{{ m.user.whatsapp or '—' }}</td><td><input type="checkbox"></td></tr>{% endfor %}{% endfor %}
+      </tbody></table>
+    </div>
+  </details>
+  {% endif %}
+</div>
+{% endblock %}

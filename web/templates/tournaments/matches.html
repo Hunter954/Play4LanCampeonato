@@ -1,0 +1,19 @@
+{% extends 'site_base.html' %}
+{% from '_ui.html' import match_row %}
+{% block title %}Partidas · {{ t.name }} · PLAY4LAN{% endblock %}
+{% block content %}
+{% include 'tournaments/_header.html' %}
+{% set groups = [('Ao vivo e em preparação', ['LIVE','LOADED','CONFIGURED','VETO']), ('Próximas', ['READY','WAITING']), ('Finalizadas', ['FINISHED'])] %}
+{% if not matches %}
+<div class="empty"><i class="bi bi-controller"></i><b>Nenhuma partida ainda</b><span>As partidas aparecem aqui quando a chave for sorteada.</span></div>
+{% endif %}
+{% for title, sts in groups %}
+{% set items = matches|selectattr('status', 'in', sts)|list %}
+{% if items %}
+<section class="section tight">
+  <div class="section-head"><h2>{{ title }}</h2><span class="muted">{{ items|length }}</span></div>
+  <div class="panel flush">{% for m in items %}{{ match_row(m) }}{% endfor %}</div>
+</section>
+{% endif %}
+{% endfor %}
+{% endblock %}

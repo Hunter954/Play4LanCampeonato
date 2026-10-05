@@ -1,0 +1,43 @@
+{% extends 'site_base.html' %}
+{% from '_ui.html' import avatar, team_logo %}
+{% block title %}Estatísticas · {{ t.name }} · PLAY4LAN{% endblock %}
+{% block content %}
+{% include 'tournaments/_header.html' %}
+{% if not players %}
+<div class="empty"><i class="bi bi-bar-chart-line"></i><b>Sem estatísticas ainda</b><span>Os números aparecem aqui a partir da primeira partida, atualizados round a round.</span></div>
+{% else %}
+{% set top = players[:3] %}
+<div class="podium">
+  {% for p in top %}
+  <a class="podium-card p{{ loop.index }}" href="{{ '/jogadores/' ~ p.user.id if p.user else '#' }}">
+    <span class="podium-pos">#{{ loop.index }}</span>
+    {{ avatar(p.user, 'lg') if p.user else '' }}
+    <b>{{ p.name }}</b><small>{{ p.team.tag if p.team else '' }}</small>
+    <div class="podium-stats"><div><b>{{ '%.2f'|format(p.rating) if p.rating is not none else '—' }}</b><span>Rating</span></div><div><b>{{ '%.2f'|format(p.kd) }}</b><span>K/D</span></div><div><b>{{ p.adr if p.adr is not none else '—' }}</b><span>ADR</span></div></div>
+  </a>
+  {% endfor %}
+</div>
+<section class="section tight">
+  <div class="section-head"><h2>Ranking de jogadores</h2><span class="muted">{{ players|length }} jogadores</span></div>
+  <div class="panel flush table-wrap">
+    <table class="stat-table">
+      <thead><tr><th>#</th><th class="left">Jogador</th><th>Mapas</th><th>K</th><th>D</th><th>A</th><th>+/-</th><th>K/D</th><th>ADR</th><th>HS%</th><th>KAST</th><th>3K+</th><th>FK</th><th>Rating</th></tr></thead>
+      <tbody>
+      {% for p in players %}
+      <tr>
+        <td class="muted">{{ loop.index }}</td>
+        <td class="left"><a class="stat-player" href="{{ '/jogadores/' ~ p.user.id if p.user else '#' }}">{{ avatar(p.user, 'xs') if p.user else '' }}<span>{{ p.name }}</span>{% if p.team %}<small>{{ p.team.tag }}</small>{% endif %}</a></td>
+        <td>{{ p.maps }}</td><td>{{ p.kills }}</td><td>{{ p.deaths }}</td><td>{{ p.assists }}</td>
+        <td class="{{ 'pos' if p.diff > 0 else 'neg' if p.diff < 0 }}">{{ '%+d'|format(p.diff) }}</td>
+        <td>{{ '%.2f'|format(p.kd) }}</td><td>{{ p.adr if p.adr is not none else '—' }}</td>
+        <td>{{ (p.hs_pct ~ '%') if p.hs_pct is not none else '—' }}</td><td>{{ (p.kast_pct ~ '%') if p.kast_pct is not none else '—' }}</td>
+        <td>{{ p.multikills }}</td><td>{{ p.first_kills }}</td>
+        <td><span class="rating {{ 'hi' if p.rating and p.rating >= 1.1 else 'lo' if p.rating and p.rating < 0.9 }}">{{ '%.2f'|format(p.rating) if p.rating is not none else '—' }}</span></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

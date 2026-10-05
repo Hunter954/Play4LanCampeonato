@@ -40,6 +40,113 @@
     setTimeout(() => { btn.innerHTML = old; }, 1800);
   }));
 
+  // Chaveamento: destaca o caminho do time
+  $$('[data-bracket]').forEach(br => {
+    const root = br.closest('main') || document;
+    br.addEventListener('mouseover', e => {
+      const bt = e.target.closest('.bt[data-team]');
+      $$('.bt.hl', root).forEach(el => el.classList.remove('hl'));
+      if (bt) $$(`.bt[data-team="${bt.dataset.team}"]`, root).forEach(el => el.classList.add('hl'));
+    });
+    br.addEventListener('mouseleave', () => $$('.bt.hl', root).forEach(el => el.classList.remove('hl')));
+  });
+
+  // Pagamento Pix: contagem regressiva + verificação automática
+  const checkout = $('[data-reg-status-url]');
+  if (checkout) {
+    const pix = $('[data-pix-expires]', checkout);
+    const cd = $('[data-countdown]', checkout);
+    if (pix && cd && pix.dataset.pixExpires) {
+      const end = new Date(pix.dataset.pixExpires).getTime();
+      const tick = () => {
+        const s = Math.max(0, Math.round((end - Date.now()) / 1000));
+        cd.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+        if (s === 0) location.reload();
+      };
+      tick(); setInterval(tick, 1000);
+    }
+    if (checkout.dataset.regStatus === 'AWAITING_PAYMENT' && pix) {
+      const poll = async () => {
+        try {
+          const r = await fetch(checkout.dataset.regStatusUrl, {headers: {Accept: 'application/json'}});
+          const d = await r.json();
+          if (d.status !== 'AWAITING_PAYMENT') location.reload();
+        } catch (_) {}
+      };
+      setInterval(poll, 5000);
+    }
+  }
+
+  // Página da partida: estado ao vivo + veto
+  const matchEl = $('[data-match]');
+  if (matchEl) {
+    const initial = $('[data-initial-state]', matchEl);
+    let state = initial ? JSON.parse(initial.textContent) : null;
+    let lastSig = '';
+    const grid = $('[data-veto-grid]', matchEl), turn = $('[data-veto-turn]', matchEl), help = $('[data-veto-help]', matchEl);
+    const section = $('[data-veto-section]', matchEl);
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    const renderVeto = st => {
+      if (!grid || !st) return;
+      const v = st.veto; const nxt = v.next;
+      const canAct = nxt && (v.my_slot === nxt.slot || v.is_admin);
+      const remaining = v.pool.filter(p => !p.action);
+      grid.innerHTML = v.pool.map(p => {
+        let cls = p.action || '', tag = '';
+        if (p.action === 'ban') tag = `${esc(p.team)} baniu`;
+        else if (p.action === 'pick') tag = `${esc(p.team)} escolheu`;
+        else if (!nxt && st.maps.some(m => m.name === p.name)) { cls = 'decider'; tag = 'Decisivo'; }
+        const click = canAct && !p.action ? 'clickable' : '';
+        return `<button type="button" class="veto-card ${cls} ${click}" style="--map-c:${esc(p.color)}" data-map="${esc(p.name)}" ${click ? '' : 'disabled'}>${tag ? `<span class="vc-tag">${tag}</span>` : ''}<small>${click ? (nxt.action === 'ban' ? 'Clique para banir' : 'Clique para escolher') : '&nbsp;'}</small><b>${esc(p.name)}</b></button>`;
+      }).join('');
+      if (nxt) {
+        const verb = nxt.action === 'ban' ? 'banir' : 'escolher';
+        turn.textContent = v.my_slot === nxt.slot ? `Sua vez de ${verb}!` : `Vez de ${nxt.team} ${verb}`;
+        turn.classList.toggle('mine', v.my_slot === nxt.slot);
+        help.textContent = v.my_slot ? 'Você é capitão: toque no mapa quando for a sua vez.' : `Restam ${remaining.length} mapas. O veto atualiza sozinho.`;
+      } else if (st.maps.length) {
+        turn.textContent = 'Veto concluído'; turn.classList.remove('mine');
+        help.textContent = `Mapa${st.maps.length > 1 ? 's' : ''}: ${st.maps.map(m => m.name).join(', ')}. Lados no round faca.`;
+      } else { turn.textContent = 'Aguardando abertura'; help.textContent = ''; }
+      if (section && (st.status === 'VETO' || st.maps.length)) section.hidden = false;
+    };
+
+    const apply = async st => {
+      state = st; renderVeto(st);
+      const s1 = $('[data-score="1"]', matchEl), s2 = $('[data-score="2"]', matchEl);
+      if (s1) s1.textContent = st.team1_score; if (s2) s2.textContent = st.team2_score;
+      const cm = $('[data-current-map]', matchEl); if (cm && st.current_map && st.status !== 'FINISHED') cm.textContent = st.current_map + (st.round ? ` · round ${st.round}` : '');
+      const sig = JSON.stringify([st.status, st.team1_score, st.team2_score, st.round, st.maps.map(m => [m.status, m.team1, m.team2])]);
+      if (lastSig && sig !== lastSig) {
+        const statusChanged = JSON.parse(lastSig)[0] !== st.status || JSON.parse(lastSig)[4]?.length !== st.maps.length;
+        if (statusChanged) { location.reload(); return; }
+        try { const r = await fetch(matchEl.dataset.boardUrl); $('[data-scoreboard]', matchEl).innerHTML = await r.text(); } catch (_) {}
+      }
+      lastSig = sig;
+    };
+
+    grid?.addEventListener('click', async e => {
+      const card = e.target.closest('.veto-card.clickable'); if (!card) return;
+      const nxt = state.veto.next;
+      if (!confirm(`${nxt.action === 'ban' ? 'Banir' : 'Escolher'} ${card.dataset.map}?`)) return;
+      card.disabled = true;
+      try {
+        const r = await fetch(matchEl.dataset.vetoUrl, {method: 'POST', headers: {'Content-Type': 'application/json', Accept: 'application/json'}, body: JSON.stringify({map: card.dataset.map})});
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Não foi possível registrar.');
+        apply(d.state);
+      } catch (err) { alert(err.message); card.disabled = false; }
+    });
+
+    if (state) apply(state);
+    const poll = async () => {
+      if (document.hidden || (state && state.status === 'FINISHED')) return;
+      try { const r = await fetch(matchEl.dataset.stateUrl, {headers: {Accept: 'application/json'}}); apply(await r.json()); } catch (_) {}
+    };
+    setInterval(poll, 3000);
+  }
+
   // Prévia ao vivo do time no formulário
   const form = $('[data-team-form]');
   const preview = $('[data-team-preview]');

@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}{{ code }} · {{ t.name }} · Admin{% endblock %}
+{% block content %}
+<div class="admin-page">
+  <section class="admin-hero">
+    <div>
+      <a class="back-link" href="/admin/tournaments/{{ t.id }}/chave"><i class="bi bi-arrow-left"></i> Chave · {{ t.name }}</a>
+      <h1>{{ m.team1.name if m.team1 else describe(m.team1_from, by_id) }} <span class="vs">vs</span> {{ m.team2.name if m.team2 else describe(m.team2_from, by_id) }}</h1>
+      <p><code>{{ code }}</code> · {{ m.label }} · MD{{ m.best_of }}{% if m.server_id %} · {{ m.server_id }}{% endif %}</p>
+    </div>
+    <div class="hero-actions">
+      <span class="soft-badge {{ 'live' if m.status == 'LIVE' else 'approved' if m.status == 'FINISHED' else 'pending' }}">{{ m.status|label }}</span>
+      <a class="button secondary" href="/partidas/{{ m.id }}" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Página da partida</a>
+    </div>
+  </section>
+
+  {% if m.status == 'FINISHED' %}
+  <section class="admin-panel">
+    <div class="panel-heading"><div><span class="section-kicker">RESULTADO</span><h2>{{ m.winner.name if m.winner else 'BYE' }} venceu{% if m.walkover %} (W.O.){% endif %}</h2><p>Placar {{ m.team1_score }} : {{ m.team2_score }}</p></div>
+      {% if can_reopen %}<form class="js-async-form" method="post" action="/admin/tournaments/partidas/{{ m.id }}/reopen" data-confirm="Desfazer o resultado e tirar os times das próximas partidas?"><button class="button ghost"><i class="bi bi-arrow-counterclockwise"></i> Desfazer resultado</button></form>
+      {% else %}<small class="muted">As partidas seguintes já começaram; o resultado não pode mais ser desfeito.</small>{% endif %}
+    </div>
+  </section>
+  {% elif not (m.team1 and m.team2) %}
+  <div class="notice"><i class="bi bi-hourglass"></i><div><b>Aguardando os times</b><span>Esta partida libera quando as partidas anteriores terminarem.</span></div></div>
+  {% else %}
+  <div class="workflow-cards steps-4">
+    <section class="admin-panel">
+      <div class="panel-heading"><div><span class="section-kicker">1 · SÉRIE</span><h2>MD{{ m.best_of }}</h2></div></div>
+      {% if m.status in ['WAITING','READY'] %}
+      <form class="js-async-form inline-form" method="post" action="/admin/tournaments/partidas/{{ m.id }}/best_of"><select name="best_of">{% for v in [1,3,5] %}<option value="{{ v }}" {{ 'selected' if m.best_of == v }}>MD{{ v }}</option>{% endfor %}</select><button class="button ghost small">Alterar</button></form>
+      {% else %}<p class="muted small">Definida. Para mudar, zere o veto.</p>{% endif %}
+    </section>
+
+    <section class="admin-panel">
+      <div class="panel-heading"><div><span class="section-kicker">2 · VETO</span><h2>{% if m.status == 'VETO' %}Em andamento{% elif m.maps_played %}Concluído{% else %}Não iniciado{% endif %}</h2></div></div>
+      {% if veto_state.actions %}
+      <ol class="veto-log">{% for a in veto_state.actions %}<li class="{{ a.action }}"><b>{{ a.team.tag }}</b> {{ {'ban':'baniu','pick':'escolheu'}[a.action] }} <b>{{ a.map_name }}</b></li>{% endfor %}</ol>
+      {% endif %}
+      {% if m.maps_played %}<p class="maps-line">{% for mm in m.maps_played %}<span>{{ mm.map_number }}. {{ mm.map_name }} <small>({{ mm.picked_by.tag if mm.picked_by else 'decisivo' }})</small></span>{% endfor %}</p>{% endif %}
+      <div class="button-stack">
+        {% if m.status in ['READY'] %}<form class="js-async-form" method="post" action="/admin/tournaments/partidas/{{ m.id }}/veto"><button class="button"><i class="bi bi-hand-index-thumb"></i> Abrir veto para os capitães</button></form>{% endif %}
+        {% if m.status in ['VETO','CONFIGURED'] %}<form class="js-async-form" method="post" action="/admin/tournaments/partidas/{{ m.id }}/veto_reset" data-confirm="Zerar o veto?"><button class="button ghost small"><i class="bi bi-arrow-counterclockwise"></i> Zerar veto</button></form>{% endif %}
+      </div>
+      {% if m.status in ['READY','VETO','CONFIGURED'] %}
+      <details class="mini-details"><summary>Definir mapa(s) sem veto</summary>
+        <form class="js-async-form" method="post" action="/admin/tournaments/partidas/{{ m.id }}/maps">
+          {% for i in range(m.best_of) %}<select name="maps">{% for mp in t.maps %}<option {{ 'selected' if loop.index0 == i }}>{{ mp }}</option>{% endfor %}</select>{% endfor %}
+          <button class="button ghost small">Definir</button>
+        </form>
+      </details>
+      {% endif %}
+      {% if m.status == 'VETO' %}<p class="muted small">Envie aos capitães: <code>{{ request.host_url }}partidas/{{ m.id }}</code></p>{% endif %}
+    </section>
+
+    <section class="admin-panel">
+      <div class="panel-heading"><div><span class="section-kicker">3 · SERVIDOR</span><h2>{{ m.server_id if m.status in ['LOADED','LIVE'] else 'Não enviado' }}</h2></div></div>
+      {% if m.status in ['CONFIGURED','LOADED','LIVE'] %}
+      <form class="js-async-form js-secure-form" data-action-label="Carregar {{ code }} no servidor" method="post" action="/admin/tournaments/partidas/{{ m.id }}/send">
+        <select name="server">{% for s in servers %}<option value="{{ s.code }}" {{ 'selected' if s.code == m.server_id }}>{{ s.display_name or s.code }} · {{ s.status }}{% if s.current_match_id and s.current_match_id != m.id %} (ocupado){% endif %}</option>{% else %}<option value="">Nenhum servidor conectado</option>{% endfor %}</select>
+        <button class="button good"><i class="bi bi-send"></i> {{ 'Reenviar' if m.status in ['LOADED','LIVE'] else 'Enviar ao servidor' }}</button>
+      </form>
+      <p class="muted small">Carrega times, SteamIDs e mapas no MatchZy; os lados saem no round faca. As estatísticas chegam sozinhas round a round.</p>
+      {% if m.status in ['LOADED','LIVE'] %}<form class="js-async-form js-secure-form" data-action-label="Encerrar partida no servidor" method="post" action="/admin/tournaments/partidas/{{ m.id }}/release"><button class="button ghost small"><i class="bi bi-eject"></i> Liberar servidor</button></form>{% endif %}
+      {% else %}<p class="muted small">Disponível depois que os mapas forem definidos.</p>{% endif %}
+    </section>
+
+    <section class="admin-panel">
+      <div class="panel-heading"><div><span class="section-kicker">4 · RESULTADO</span><h2>{{ m.team1_score }} : {{ m.team2_score }}</h2></div></div>
+      <p class="muted small">Normalmente o resultado vem sozinho do servidor. Use isto para W.O. ou correções.</p>
+      <form class="js-async-form result-form" method="post" action="/admin/tournaments/partidas/{{ m.id }}/result" data-confirm="Registrar o resultado e avançar a chave?">
+        <label class="radio-row"><input type="radio" name="winner" value="1" required> {{ m.team1.name }} <input name="team1_score" type="number" min="0" value="{{ m.team1_score }}"></label>
+        <label class="radio-row"><input type="radio" name="winner" value="2"> {{ m.team2.name }} <input name="team2_score" type="number" min="0" value="{{ m.team2_score }}"></label>
+        <label class="check-inline"><input type="checkbox" name="walkover" value="1"> W.O.</label>
+        <button class="button"><i class="bi bi-flag"></i> Registrar resultado</button>
+      </form>
+    </section>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

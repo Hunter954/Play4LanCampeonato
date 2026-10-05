@@ -1,0 +1,29 @@
+{% from '_ui.html' import avatar, team_logo %}
+{% for map_number, teams in board.items() %}
+{% set mm = (maps|selectattr('map_number', 'equalto', map_number)|first) %}
+<section class="section tight">
+  <div class="section-head"><h2>{% if mm %}{{ mm.map_name }}{% else %}Mapa {{ map_number }}{% endif %}</h2>{% if mm %}<span class="map-score">{{ mm.team1_score }} : {{ mm.team2_score }}</span>{% endif %}</div>
+  {% for team in [m.team1, m.team2] if team %}
+  {% set rows = teams.get(team.id, []) %}
+  <div class="panel flush table-wrap sb-team {{ 'won' if mm and mm.winner_id == team.id }}">
+    <div class="sb-head">{{ team_logo(team, 'xs') }}<b>{{ team.name }}</b>{% if mm %}<span class="sb-score">{{ mm.team1_score if team.id == m.team1_id else mm.team2_score }}</span>{% endif %}</div>
+    <table class="stat-table">
+      <thead><tr><th class="left">Jogador</th><th>K</th><th>D</th><th>A</th><th>+/-</th><th>K/D</th><th>ADR</th><th>HS%</th><th>KAST</th><th>MK</th><th>FK</th><th>Rating</th></tr></thead>
+      <tbody>
+      {% for p in rows %}
+      <tr>
+        <td class="left"><a class="stat-player" href="{{ '/jogadores/' ~ p.user.id if p.user else '#' }}">{{ avatar(p.user, 'xs') if p.user else '' }}<span>{{ p.name }}</span></a></td>
+        <td>{{ p.kills }}</td><td>{{ p.deaths }}</td><td>{{ p.assists }}</td>
+        <td class="{{ 'pos' if p.diff > 0 else 'neg' if p.diff < 0 }}">{{ '%+d'|format(p.diff) }}</td>
+        <td>{{ '%.2f'|format(p.kd) }}</td><td>{{ p.adr if p.adr is not none else '—' }}</td>
+        <td>{{ (p.hs_pct ~ '%') if p.hs_pct is not none else '—' }}</td><td>{{ (p.kast_pct ~ '%') if p.kast_pct is not none else '—' }}</td>
+        <td>{{ p.multikills }}</td><td>{{ p.first_kills }}</td>
+        <td><span class="rating {{ 'hi' if p.rating and p.rating >= 1.1 else 'lo' if p.rating and p.rating < 0.9 }}">{{ '%.2f'|format(p.rating) if p.rating is not none else '—' }}</span></td>
+      </tr>
+      {% else %}<tr><td colspan="12" class="muted">Sem dados deste time ainda.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+</section>
+{% endfor %}

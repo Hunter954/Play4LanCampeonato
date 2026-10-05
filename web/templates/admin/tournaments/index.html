@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Campeonatos · Admin PLAY4LAN{% endblock %}
+{% block content %}
+<div class="admin-page">
+  <section class="admin-hero">
+    <div><span class="eyebrow"><i class="bi bi-trophy"></i> COMPETIÇÕES</span><h1>Campeonatos</h1><p>Inscrições, pagamentos, chaveamento e partidas.</p></div>
+    <div class="hero-actions"><a class="button" href="/admin/tournaments/create"><i class="bi bi-plus-lg"></i> Novo campeonato</a></div>
+  </section>
+  <div class="list-panel">
+    {% for t in tournaments %}
+    <a class="admin-list-row" href="/admin/tournaments/{{ t.id }}">
+      <div class="list-avatar"><i class="bi bi-trophy-fill"></i></div>
+      <div class="list-main"><b>{{ t.name }}</b><span>{{ t.approved_count }}/{{ t.max_teams }} confirmados · {{ 'R$ %.2f'|format(t.entry_fee)|replace('.', ',') if t.entry_fee_cents else 'Gratuito' }}{% if t.starts_at %} · {{ t.starts_at.strftime('%d/%m/%Y') }}{% endif %}</span></div>
+      <span class="soft-badge {{ t.status|lower }}">{{ t.status|label }}</span>
+      <i class="bi bi-chevron-right muted"></i>
+    </a>
+    {% else %}<div class="empty-inline"><i class="bi bi-trophy"></i> Nenhum campeonato ainda.</div>{% endfor %}
+  </div>
+</div>
+{% endblock %}

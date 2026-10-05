@@ -12,11 +12,20 @@ load_dotenv()
 ADDED_COLUMNS = {
     'user': {'whatsapp': 'VARCHAR(32)', 'city': 'VARCHAR(80)', 'bio': 'VARCHAR(280)', 'onboarded_at': 'TIMESTAMP', 'last_login_at': 'TIMESTAMP'},
     'team': {'description': 'VARCHAR(280)'},
+    'tournament': {'starts_at': 'TIMESTAMP', 'location': 'VARCHAR(160)', 'prize': 'TEXT', 'rules': 'TEXT', 'entry_fee_cents': 'INTEGER DEFAULT 0',
+                   'bo_default': 'INTEGER DEFAULT 1', 'bo_upper_final': 'INTEGER DEFAULT 3', 'bo_lower_final': 'INTEGER DEFAULT 1', 'bo_grand_final': 'INTEGER DEFAULT 3'},
+    'tournament_registration': {'seed': 'INTEGER', 'paid_at': 'TIMESTAMP', 'admin_note': 'VARCHAR(280)'},
+    'match': {'bracket': 'VARCHAR(10)', 'round': 'INTEGER', 'position': 'INTEGER', 'label': 'VARCHAR(60)', 'team1_from': 'VARCHAR(20)', 'team2_from': 'VARCHAR(20)',
+              'next_match_id': 'INTEGER', 'next_slot': 'INTEGER', 'loser_match_id': 'INTEGER', 'loser_slot': 'INTEGER', 'winner_id': 'INTEGER',
+              'walkover': 'BOOLEAN DEFAULT FALSE', 'config_token': 'VARCHAR(64)', 'started_at': 'TIMESTAMP', 'finished_at': 'TIMESTAMP'},
 }
 
 STATUS_LABELS = {
-    'REGISTRATION': 'Inscrições abertas', 'CHECKIN': 'Check-in', 'RUNNING': 'Em andamento', 'LIVE': 'Ao vivo', 'FINISHED': 'Finalizado', 'CANCELLED': 'Cancelado',
-    'SCHEDULED': 'Agendada', 'PENDING': 'Aguardando aprovação', 'APPROVED': 'Confirmado', 'REJECTED': 'Recusado',
+    'REGISTRATION': 'Inscrições abertas', 'CHECKIN': 'Check-in', 'CLOSED': 'Inscrições encerradas', 'RUNNING': 'Em andamento', 'LIVE': 'Ao vivo', 'FINISHED': 'Finalizado', 'CANCELLED': 'Cancelado',
+    'SCHEDULED': 'Agendada', 'PENDING': 'Em análise', 'APPROVED': 'Confirmado', 'REJECTED': 'Recusado',
+    'AWAITING_PAYMENT': 'Aguardando pagamento', 'PAYMENT_REVIEW': 'Pagamento em análise',
+    'WAITING': 'Aguardando times', 'READY': 'Pronta', 'VETO': 'Veto de mapas', 'CONFIGURED': 'Mapas definidos', 'LOADED': 'No servidor',
+    'UPPER': 'Upper', 'LOWER': 'Lower', 'FINAL': 'Grande final',
     'DOUBLE_ELIMINATION': 'Dupla eliminação', 'SINGLE_ELIMINATION': 'Eliminação simples', 'SWISS': 'Suíço', 'ROUND_ROBIN': 'Pontos corridos',
 }
 
@@ -28,7 +37,7 @@ def _ensure_columns():
         existing = {c['name'] for c in insp.get_columns(table)}
         for name, ddl in cols.items():
             if name not in existing:
-                db.session.execute(text(f'ALTER TABLE "{table}" ADD COLUMN {name} {ddl}'))
+                db.session.execute(text(f'ALTER TABLE "{table}" ADD COLUMN "{name}" {ddl}'))
     db.session.commit()
 
 def create_app():
@@ -66,8 +75,11 @@ def create_app():
     from web.routes.tournaments import bp as tournaments_bp
     from web.routes.admin import bp as admin_bp
     from web.routes.api import bp as api_bp
+    from web.routes.matches import bp as matches_bp
+    from web.routes.admin_tournaments import bp as admin_t_bp
     app.register_blueprint(main_bp); app.register_blueprint(auth_bp); app.register_blueprint(teams_bp)
     app.register_blueprint(tournaments_bp); app.register_blueprint(admin_bp); app.register_blueprint(api_bp)
+    app.register_blueprint(matches_bp); app.register_blueprint(admin_t_bp)
 
     with app.app_context():
         db.create_all(); _ensure_columns()

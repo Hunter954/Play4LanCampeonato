@@ -1,25 +1,32 @@
 {% extends 'site_base.html' %}
-{% from '_ui.html' import avatar, team_logo, badge, match_row %}
+{% from '_ui.html' import avatar, team_logo, badge, money, match_row %}
 {% block title %}{{ t.name }} · PLAY4LAN{% endblock %}
 {% block content %}
-{% set filled = t.approved_count %}
-<section class="t-banner">
-  <div class="t-banner-main">
-    {{ badge(t.status) }}
-    <h1>{{ t.name }}</h1>
-    {% if t.description %}<p>{{ t.description }}</p>{% endif %}
-  </div>
-  <div class="t-facts">
-    <div><i class="bi bi-diagram-3"></i><span>Formato</span><b>{{ t.format|label }}</b></div>
-    <div><i class="bi bi-people"></i><span>Vagas</span><b>{{ filled }}/{{ t.max_teams }}</b></div>
-    <div><i class="bi bi-person-badge"></i><span>Elenco</span><b>{{ roster_size }} jogadores</b></div>
-    <div><i class="bi bi-geo-alt"></i><span>Local</span><b>Presencial</b></div>
-  </div>
-  <div class="slots"><div class="slots-bar big"><span style="width: {{ [100, (filled * 100 / (t.max_teams or 1))|round]|min }}%"></span></div><small><b>{{ filled }}</b> de {{ t.max_teams }} times confirmados · {{ regs|length }} inscrições</small></div>
-</section>
+{% include 'tournaments/_header.html' %}
 
 <div class="team-layout">
   <div>
+    {% if live %}
+    <section class="section tight">
+      <div class="section-head"><h2><span class="live-dot-sm"></span> Ao vivo</h2></div>
+      <div class="panel flush">{% for m in live %}{{ match_row(m) }}{% endfor %}</div>
+    </section>
+    {% endif %}
+
+    {% if t.description %}
+    <section class="section tight"><div class="section-head"><h2>Sobre</h2></div><div class="panel prose">{{ t.description }}</div></section>
+    {% endif %}
+
+    <section class="section tight">
+      <div class="section-head"><h2>Como funciona a inscrição</h2></div>
+      <ol class="flow">
+        <li><span>1</span><div><b>Monte o time com 5 jogadores</b><small>Todos entram com a Steam e completam o cadastro.</small></div></li>
+        <li><span>2</span><div><b>Capitão paga a inscrição via Pix</b><small>{{ money(t.entry_fee_cents) }} por time, confirmado na hora pelo Mercado Pago.</small></div></li>
+        <li><span>3</span><div><b>Vaga garantida e elenco travado</b><small>A chave é sorteada quando as inscrições fecham.</small></div></li>
+        <li><span>4</span><div><b>No dia: veto pelo celular e jogo</b><small>Os capitães banem os mapas aqui no site e o servidor já sobe com os times.</small></div></li>
+      </ol>
+    </section>
+
     {% if t.maps %}
     <section class="section tight">
       <div class="section-head"><h2>Map pool</h2></div>
@@ -28,51 +35,56 @@
     {% endif %}
 
     <section class="section tight">
-      <div class="section-head"><h2>Times inscritos</h2><span class="muted">{{ regs|length }}</span></div>
+      <div class="section-head"><h2>Times confirmados</h2><span class="muted">{{ confirmed|length }}/{{ t.max_teams }}</span></div>
       <div class="team-grid compact">
-        {% for r in regs %}
-        <a class="team-card" href="/teams/{{ r.team.id }}">{{ team_logo(r.team, 'sm') }}<div class="team-card-body"><b>{{ r.team.name }}</b><small>{{ r.team.tag }}</small><span class="card-badge">{{ badge(r.status) }}</span></div></a>
-        {% else %}<div class="empty small"><i class="bi bi-people"></i><b>Nenhum time inscrito ainda</b><span>Garanta a vaga do seu time.</span></div>{% endfor %}
+        {% for r in confirmed %}
+        <a class="team-card" href="/teams/{{ r.team.id }}">{{ team_logo(r.team, 'sm') }}<div class="team-card-body"><b>{{ r.team.name }}</b><small>{{ r.team.tag }}{% if r.seed and t.has_bracket %} · Seed {{ r.seed }}{% endif %}</small><div class="avatar-stack">{% for m in r.team.roster %}{{ avatar(m.user, 'xs') }}{% endfor %}</div></div></a>
+        {% else %}<div class="empty small"><i class="bi bi-people"></i><b>Nenhum time confirmado ainda</b><span>Garanta a vaga do seu time.</span></div>{% endfor %}
       </div>
     </section>
 
-    {% if matches %}
-    <section class="section tight">
-      <div class="section-head"><h2>Partidas</h2></div>
-      <div class="panel flush">{% for m in matches %}{{ match_row(m) }}{% endfor %}</div>
-    </section>
+    {% if t.prize or t.rules %}
+    <div class="two-col">
+      {% if t.prize %}<section class="section tight"><div class="section-head"><h2>Premiação</h2></div><div class="panel prose">{{ t.prize }}</div></section>{% endif %}
+      {% if t.rules %}<section class="section tight"><div class="section-head"><h2>Regras</h2></div><div class="panel prose">{{ t.rules }}</div></section>{% endif %}
+    </div>
     {% endif %}
   </div>
 
   <aside class="team-side">
     <section class="panel register-panel">
-      <div class="panel-head"><h3><i class="bi bi-pencil-square"></i> Inscrição</h3></div>
+      <div class="panel-head"><h3><i class="bi bi-pencil-square"></i> Inscrição</h3><span class="price">{{ money(t.entry_fee_cents) }}</span></div>
       {% if not current_user.is_authenticated %}
         <p class="muted small">Entre com a Steam para inscrever seu time.</p>
         <a class="btn btn-steam btn-block" href="/auth/steam?next={{ request.path|urlencode }}"><i class="bi bi-steam"></i> Entrar com Steam</a>
       {% elif not current_user.is_onboarded %}
         <p class="muted small">Complete seu cadastro para continuar.</p>
         <a class="btn btn-primary btn-block" href="/auth/profile?next={{ request.path|urlencode }}">Completar cadastro</a>
+      {% elif my_reg %}
+        <div class="reg-item"><div class="reg-team">{{ team_logo(my_reg.team, 'sm') }}<div><b>{{ my_reg.team.name }}</b><small>Seu time</small></div></div>{{ badge(my_reg.status) }}
+        <a class="btn btn-ghost btn-sm btn-block" href="/tournaments/{{ t.id }}/inscricao/{{ my_reg.team_id }}">Ver inscrição</a></div>
       {% elif not my_teams %}
-        <p class="muted small">Só o <b>capitão</b> pode inscrever o time. Você não é capitão de nenhum time.</p>
+        <p class="muted small">Só o <b>capitão</b> inscreve o time. Crie um time ou peça para o seu capitão.</p>
         <a class="btn btn-primary btn-block" href="/teams/create"><i class="bi bi-plus-lg"></i> Criar time</a>
       {% else %}
         {% for item in my_teams %}{% set team = item.team %}
         <div class="reg-item">
           <div class="reg-team">{{ team_logo(team, 'sm') }}<div><b>{{ team.name }}</b><small>{{ team.members|length }}/{{ roster_size }} jogadores</small></div></div>
-          {% if item.registered %}
-            <p class="ok-text small"><i class="bi bi-check-circle-fill"></i> Inscrito{% for r in regs if r.team_id == team.id %} · {{ r.status|label }}{% endfor %}</p>
-            {% if t.is_open %}<form method="post" action="/tournaments/{{ t.id }}/unregister/{{ team.id }}" data-confirm="Cancelar a inscrição do {{ team.name }}?"><button class="btn btn-ghost btn-sm btn-block" type="submit">Cancelar inscrição</button></form>{% endif %}
+          {% if item.reg %}
+            {{ badge(item.reg.status) }}
+            <a class="btn {{ 'btn-primary' if item.reg.status == 'AWAITING_PAYMENT' else 'btn-ghost' }} btn-sm btn-block" href="/tournaments/{{ t.id }}/inscricao/{{ team.id }}">{{ 'Pagar inscrição' if item.reg.status == 'AWAITING_PAYMENT' else 'Ver inscrição' }}</a>
           {% elif item.problems %}
             <ul class="problems">{% for p in item.problems %}<li><i class="bi bi-x-circle"></i> {{ p }}</li>{% endfor %}</ul>
             <a class="btn btn-ghost btn-sm btn-block" href="/teams/{{ team.id }}">Ajustar time</a>
           {% else %}
-            <form method="post" action="/tournaments/{{ t.id }}/register/{{ team.id }}"><button class="btn btn-primary btn-block" type="submit"><i class="bi bi-trophy"></i> Inscrever {{ team.tag }}</button></form>
+            <p class="ok-text small"><i class="bi bi-check-circle-fill"></i> Elenco completo, pronto para inscrever.</p>
+            <form method="post" action="/tournaments/{{ t.id }}/register/{{ team.id }}"><button class="btn btn-primary btn-block" type="submit"><i class="bi bi-trophy"></i> {{ 'Inscrever e pagar' if t.entry_fee_cents else 'Inscrever' }} {{ team.tag }}</button></form>
           {% endif %}
         </div>
         {% endfor %}
       {% endif %}
     </section>
+    <a class="panel side-link" href="/tournaments/{{ t.id }}/chave"><i class="bi bi-diagram-3"></i><div><b>Chaveamento</b><small>{{ 'Upper, lower e grande final' if t.has_bracket else 'Sai quando as inscrições fecharem' }}</small></div><i class="bi bi-chevron-right"></i></a>
   </aside>
 </div>
 {% endblock %}

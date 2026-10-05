@@ -2,24 +2,64 @@
 {% from '_ui.html' import avatar, team_logo %}
 {% block title %}{{ player.display_name }} · PLAY4LAN{% endblock %}
 {% block content %}
-<section class="profile-head">
+<section class="profile-head player-head">
   {{ avatar(player, 'xl') }}
   <div class="profile-id">
     <span class="kicker">Jogador</span>
     <h1>{{ player.display_name }}</h1>
-    <p class="muted">{% if player.city %}<i class="bi bi-geo-alt"></i> {{ player.city }} · {% endif %}Na PLAY4LAN desde {{ player.created_at.strftime('%m/%Y') if player.created_at else '—' }}</p>
+    <p class="muted">{% if teams %}{{ team_logo(teams[0], 'xs') }} {{ teams[0].name }} · {% endif %}{% if player.city %}<i class="bi bi-geo-alt"></i> {{ player.city }} · {% endif %}Na PLAY4LAN desde {{ player.created_at.strftime('%m/%Y') if player.created_at else '—' }}</p>
   </div>
   <div class="profile-actions">
     <a class="btn btn-ghost" href="{{ player.steam_profile_url or 'https://steamcommunity.com/profiles/' ~ player.steam_id64 }}" target="_blank" rel="noopener"><i class="bi bi-steam"></i> Perfil Steam</a>
   </div>
 </section>
+
+<div class="stat-tiles">
+  <div class="tile big"><span>Rating</span><b class="{{ 'hi' if career.rating and career.rating >= 1.1 else 'lo' if career.rating and career.rating < 0.9 }}">{{ '%.2f'|format(career.rating) if career.rating is not none else '—' }}</b></div>
+  <div class="tile"><span>K/D</span><b>{{ '%.2f'|format(career.kd) if career.maps else '—' }}</b></div>
+  <div class="tile"><span>ADR</span><b>{{ career.adr if career.adr is not none else '—' }}</b></div>
+  <div class="tile"><span>HS%</span><b>{{ (career.hs_pct ~ '%') if career.hs_pct is not none else '—' }}</b></div>
+  <div class="tile"><span>KAST</span><b>{{ (career.kast_pct ~ '%') if career.kast_pct is not none else '—' }}</b></div>
+  <div class="tile"><span>Mapas</span><b>{{ career.maps }}</b></div>
+  <div class="tile"><span>Abates</span><b>{{ career.kills }}</b></div>
+  <div class="tile"><span>Multikills</span><b>{{ career.multikills }}</b></div>
+  <div class="tile"><span>Clutches</span><b>{{ career.clutches_won }}</b></div>
+  <div class="tile"><span>First kills</span><b>{{ career.first_kills }}</b></div>
+</div>
+
 {% if player.bio %}<div class="panel bio">{{ player.bio }}</div>{% endif %}
-<section class="section">
-  <div class="section-head"><div><span class="kicker">Times</span><h2>Onde joga</h2></div></div>
-  <div class="team-grid">
-    {% for t in teams %}
-    <a class="team-card" href="/teams/{{ t.id }}">{{ team_logo(t, 'md') }}<div><b>{{ t.name }}</b><small>{{ t.tag }} · {{ 'Capitão' if t.owner_id == player.id else 'Jogador' }}</small></div></a>
-    {% else %}<div class="empty small"><i class="bi bi-people"></i><b>Sem time no momento</b></div>{% endfor %}
-  </div>
-</section>
+
+<div class="team-layout">
+  <section class="section tight">
+    <div class="section-head"><h2>Últimas partidas</h2></div>
+    {% if recent %}
+    <div class="panel flush table-wrap">
+      <table class="stat-table">
+        <thead><tr><th class="left">Partida</th><th>Mapa</th><th>Res.</th><th>K-D-A</th><th>ADR</th><th>HS%</th><th>Rating</th></tr></thead>
+        <tbody>
+        {% for r in recent %}{% set m = r.match %}
+        <tr>
+          <td class="left"><a href="/partidas/{{ m.id }}" class="stat-player"><span>{{ m.team1.tag if m.team1 else '?' }} vs {{ m.team2.tag if m.team2 else '?' }}</span><small>{{ m.label or '' }}</small></a></td>
+          <td>{{ r.map }}</td>
+          <td><span class="res {{ 'w' if r.won else 'l' }}">{{ 'V' if r.won else 'D' }}</span></td>
+          <td>{{ r.kills }}-{{ r.deaths }}-{{ r.assists }}</td>
+          <td>{{ r.adr if r.adr is not none else '—' }}</td>
+          <td>{{ (r.hs_pct ~ '%') if r.hs_pct is not none else '—' }}</td>
+          <td><span class="rating {{ 'hi' if r.rating and r.rating >= 1.1 else 'lo' if r.rating and r.rating < 0.9 }}">{{ '%.2f'|format(r.rating) if r.rating is not none else '—' }}</span></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}<div class="empty small"><i class="bi bi-bar-chart-line"></i><b>Nenhuma partida registrada ainda</b><span>As estatísticas aparecem aqui depois do primeiro jogo no campeonato.</span></div>{% endif %}
+  </section>
+  <aside class="team-side">
+    <section class="panel">
+      <div class="panel-head"><h3><i class="bi bi-people"></i> Times</h3></div>
+      {% for t in teams %}
+      <a class="list-row" href="/teams/{{ t.id }}">{{ team_logo(t, 'sm') }}<div><b>{{ t.name }}</b><small>{{ t.tag }} · {{ 'Capitão' if t.owner_id == player.id else 'Jogador' }}</small></div></a>
+      {% else %}<p class="muted small">Sem time no momento.</p>{% endfor %}
+    </section>
+  </aside>
+</div>
 {% endblock %}

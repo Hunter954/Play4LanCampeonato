@@ -190,6 +190,7 @@
       let data = {}; try { data = await res.json(); } catch (_) {}
       if (!res.ok) throw new Error(data.error || `Erro HTTP ${res.status}`);
       toast(data.message || 'Ação enviada', 'O servidor será atualizado automaticamente.');
+      if (data.reload) setTimeout(() => location.reload(), 700);
       if (form.action.includes('/security/pin') && form.querySelector('[name="new_pin"]')) form.reset();
       setTimeout(fetchServerState, 350);
       return true;
@@ -220,6 +221,7 @@
     const form = e.target.closest('.js-async-form');
     if (!form) return;
     e.preventDefault();
+    if (form.dataset.confirm && !confirm(form.dataset.confirm)) return;
     if (form.classList.contains('js-secure-form')) openPin(form);
     else sendForm(form);
   });

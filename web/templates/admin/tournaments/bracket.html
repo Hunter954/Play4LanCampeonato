@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Chave · {{ t.name }} · Admin{% endblock %}
+{% block content %}
+<div class="admin-page">
+  {% include 'admin/tournaments/_nav.html' %}
+
+  <section class="admin-panel">
+    <div class="panel-heading"><div><span class="section-kicker">SORTEIO</span><h2>{{ 'Recriar chave' if final else 'Gerar chave' }}</h2><p>{{ confirmed|length }} times confirmados{% if size %} → chave de {{ size }}{% if size > confirmed|length %} ({{ size - confirmed|length }} BYE){% endif %}{% endif %}. Dupla eliminação com lower cruzada.</p></div></div>
+    <form class="js-async-form gen-form" method="post" action="/admin/tournaments/{{ t.id }}/chave/gerar" {% if final %}data-confirm="Recriar a chave apaga todas as partidas atuais. Continuar?"{% endif %}>
+      <label class="radio-chip"><input type="radio" name="seeding" value="random" checked><span><b>Sorteio</b><small>Ordem aleatória</small></span></label>
+      <label class="radio-chip"><input type="radio" name="seeding" value="manual"><span><b>Seeds manuais</b><small>Use a coluna Seed das inscrições</small></span></label>
+      <label class="radio-chip"><input type="radio" name="seeding" value="order"><span><b>Ordem de pagamento</b><small>Quem pagou primeiro é seed 1</small></span></label>
+      {% if final %}<label class="check-inline"><input type="checkbox" name="force" value="1"> Forçar (apaga resultados)</label>{% endif %}
+      <button class="button" {{ 'disabled' if confirmed|length < 2 }}><i class="bi bi-shuffle"></i> {{ 'Recriar chave' if final else 'Gerar chave' }}</button>
+    </form>
+    {% if final %}<form class="js-async-form" method="post" action="/admin/tournaments/{{ t.id }}/chave/resetar" data-confirm="Apagar a chave inteira?"><button class="button ghost small"><i class="bi bi-trash3"></i> Apagar chave</button></form>{% endif %}
+  </section>
+
+  {% if final %}
+  {% for title, cols in [('Upper', upper), ('Lower', lower), ('Grande final', [[final]])] %}
+  <section class="admin-section">
+    <div class="section-heading"><div><span class="section-kicker">{{ title|upper }}</span><h2>{{ title }}</h2></div></div>
+    <div class="adm-bracket">
+      {% for col in cols %}
+      <div class="adm-col"><div class="adm-col-title">{{ col[0].label }}{% if col[0].best_of > 1 %} · MD{{ col[0].best_of }}{% endif %}</div>
+        {% for m in col %}
+        <a class="adm-match st-{{ m.status|lower }}" href="/admin/tournaments/partidas/{{ m.id }}">
+          <div class="adm-top"><code>{{ code(m) }}</code><span class="soft-badge {{ 'live' if m.status == 'LIVE' else 'approved' if m.status == 'FINISHED' else 'pending' if m.status in ['READY','VETO','CONFIGURED','LOADED'] else '' }}">{{ m.status|label }}</span></div>
+          {% for slot in [1,2] %}{% set team = m.team1 if slot == 1 else m.team2 %}
+          <div class="adm-team {{ 'win' if m.winner_id and team and m.winner_id == team.id }}"><span>{{ team.name if team else describe(m.team1_from if slot == 1 else m.team2_from, by_id) }}</span><b>{% if m.status in ['LIVE','FINISHED'] and team and not m.walkover %}{{ m.team1_score if slot == 1 else m.team2_score }}{% endif %}</b></div>
+          {% endfor %}
+          {% if m.server_id and m.status in ['LOADED','LIVE'] %}<small class="muted"><i class="bi bi-hdd-network"></i> {{ m.server_id }}</small>{% endif %}
+        </a>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

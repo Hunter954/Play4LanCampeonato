@@ -4,11 +4,14 @@ from datetime import datetime
 
 from flask import Blueprint, abort, jsonify, redirect, request
 
+import hmac
+
 from web.extensions import db, socketio
-from web.models import Demo, MatchEvent, Server, ServerCommand
+from web.models import Demo, Match, MatchEvent, Payment, Server, ServerCommand
 from web.live_state import set_server_state
 from web.player_identity import enrich_telemetry
 from web.storage import presigned_download, upload_fileobj
+from web import matchzy, payments, registrations
 
 bp = Blueprint('api', __name__, url_prefix='/api/v1')
 
@@ -16,6 +19,14 @@ bp = Blueprint('api', __name__, url_prefix='/api/v1')
 def auth_agent():
     if request.headers.get('Authorization') != 'Bearer ' + os.getenv('AGENT_SHARED_TOKEN', ''):
         abort(401)
+
+
+def _match_by_token(mid=None):
+    token = request.args.get('token') or ''
+    match = db.session.get(Match, mid) if mid else Match.query.filter_by(config_token=token).first() if token else None
+    if not match or not match.config_token or not hmac.compare_digest(match.config_token, token):
+        abort(403)
+    return match
 
 
 def _iso(value):
@@ -68,6 +79,11 @@ def heartbeat():
                 payload=telemetry,
             ))
         realtime_updates.append((row, telemetry))
+
+        if row.current_match_id:
+            match = db.session.get(Match, row.current_match_id)
+            if match and matchzy.telemetry_fallback(match, telemetry):
+                socketio.emit('match_update', {'match_id': match.id})
 
     db.session.commit()
 
@@ -178,6 +194,48 @@ def demo_upload():
     db.session.add(demo)
     db.session.commit()
     return jsonify(ok=True, id=demo.id)
+
+
+@bp.get('/matches/<int:mid>/config')
+def match_config(mid):
+    """Configuração lida pelo MatchZy via matchzy_loadmatch_url."""
+    match = _match_by_token(mid)
+    if not (match.team1 and match.team2 and match.maps_played):
+        return jsonify(error='Partida sem times ou mapas definidos.'), 409
+    return jsonify(matchzy.config(match))
+
+
+@bp.post('/matchzy/events')
+def matchzy_events():
+    """Eventos enviados pelo MatchZy (matchzy_remote_log_url)."""
+    match = _match_by_token()
+    ev = request.get_json(silent=True) or {}
+    if str(ev.get('matchid', match.id)) != str(match.id):
+        return jsonify(ok=False, error='matchid não confere'), 409
+    db.session.add(MatchEvent(event_uuid=str(uuid.uuid4()), server_id=match.server_id, match_id=match.id,
+                              event_type='MATCHZY_' + str(ev.get('event') or 'unknown').upper(), payload=ev))
+    changed = matchzy.handle_event(match, ev)
+    db.session.commit()
+    if changed: socketio.emit('match_update', {'match_id': match.id})
+    return jsonify(ok=True)
+
+
+@bp.post('/payments/mercadopago/webhook')
+def mercadopago_webhook():
+    body = request.get_json(silent=True) or {}
+    kind = request.args.get('type') or request.args.get('topic') or body.get('type') or body.get('topic')
+    data_id = request.args.get('data.id') or request.args.get('id') or (body.get('data') or {}).get('id')
+    if kind not in (None, 'payment') or not data_id:
+        return jsonify(ok=True, ignored=True)
+    if not payments.valid_signature(request.headers.get('x-signature'), request.headers.get('x-request-id'), request.args.get('data.id') or data_id):
+        return jsonify(ok=False, error='assinatura inválida'), 401
+    payment = Payment.query.filter_by(provider='mercadopago', provider_payment_id=str(data_id)).first()
+    if not payment:
+        return jsonify(ok=True, ignored=True)
+    registrations.sync(payment, force=True)  # status sempre confirmado direto na API do Mercado Pago
+    db.session.commit()
+    socketio.emit('registration_update', {'registration_id': payment.registration_id})
+    return jsonify(ok=True)
 
 
 @bp.get('/demos/<int:did>/download')

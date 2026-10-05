@@ -1,0 +1,81 @@
+{% extends 'site_base.html' %}
+{% from '_ui.html' import avatar, team_logo, badge, money %}
+{% block title %}Inscrição {{ team.name }} · {{ t.name }} · PLAY4LAN{% endblock %}
+{% block content %}
+<a class="back" href="/tournaments/{{ t.id }}"><i class="bi bi-arrow-left"></i> {{ t.name }}</a>
+<div class="checkout" data-reg-status-url="/tournaments/{{ t.id }}/inscricao/{{ team.id }}/status" data-reg-status="{{ reg.status }}">
+  <section class="panel checkout-main">
+    {% if reg.status == 'APPROVED' %}
+      <div class="confirmed">
+        <span class="confirmed-icon"><i class="bi bi-check-lg"></i></span>
+        <span class="kicker">Inscrição confirmada</span>
+        <h1>{{ team.name }} está no {{ t.name }}!</h1>
+        <p class="muted">Vaga garantida{% if reg.paid_at %}, pagamento recebido em {{ reg.paid_at.strftime('%d/%m às %H:%M') }}{% endif %}. O elenco está travado. Fique de olho no chaveamento: ele é sorteado quando as inscrições fecharem.</p>
+        <div class="form-actions center"><a class="btn btn-primary" href="/tournaments/{{ t.id }}/chave"><i class="bi bi-diagram-3"></i> Ver chaveamento</a><a class="btn btn-ghost" href="/teams/{{ team.id }}">Página do time</a></div>
+      </div>
+    {% elif reg.status in ['PAYMENT_REVIEW', 'PENDING'] %}
+      <div class="confirmed review">
+        <span class="confirmed-icon"><i class="bi bi-hourglass-split"></i></span>
+        <span class="kicker">Em análise</span>
+        <h1>Recebemos sua inscrição</h1>
+        <p class="muted">{{ reg.admin_note or 'A organização está conferindo sua inscrição. Você será confirmado em breve.' }}</p>
+      </div>
+    {% elif reg.status in ['REJECTED', 'CANCELLED'] %}
+      <div class="confirmed review">
+        <span class="confirmed-icon bad"><i class="bi bi-x-lg"></i></span>
+        <h1>Inscrição {{ reg.status|label|lower }}</h1>
+        <p class="muted">{{ reg.admin_note or 'Fale com a organização se tiver dúvidas.' }}</p>
+        <a class="btn btn-ghost" href="/tournaments/{{ t.id }}">Voltar ao campeonato</a>
+      </div>
+    {% else %}
+      <span class="kicker">Passo final</span>
+      <h1>Pagamento da inscrição</h1>
+      <p class="muted">A vaga é confirmada automaticamente assim que o Pix cai. Valor por time: <b class="hl-text">{{ money(t.entry_fee_cents) }}</b></p>
+
+      {% if payment and payment.is_open %}
+        <div class="pix" data-pix-expires="{{ payment.expires_at.isoformat() ~ 'Z' if payment.expires_at }}">
+          {% if payment.qr_code_base64 %}<img class="pix-qr" src="data:image/png;base64,{{ payment.qr_code_base64 }}" alt="QR Code Pix">{% endif %}
+          <div class="pix-info">
+            <ol class="pix-steps">
+              <li>Abra o app do seu banco e escolha <b>Pix &rarr; Ler QR Code</b> ou <b>Pix copia e cola</b>.</li>
+              <li>Confira o valor: <b>{{ money(payment.amount_cents) }}</b>.</li>
+              <li>Pague. Esta tela atualiza sozinha quando o pagamento for aprovado.</li>
+            </ol>
+            <div class="copy-box"><input readonly value="{{ payment.qr_code }}" data-copy-source><button class="btn btn-primary btn-sm" type="button" data-copy><i class="bi bi-clipboard"></i> Copiar código</button></div>
+            <p class="pix-wait"><span class="spinner"></span> Aguardando pagamento · expira em <b data-countdown>--:--</b></p>
+          </div>
+        </div>
+      {% elif not is_captain %}
+        <div class="notice-box"><i class="bi bi-info-circle"></i> Só o capitão <b>{{ team.owner.display_name }}</b> pode gerar o Pix e pagar a inscrição.</div>
+      {% elif not mp_enabled %}
+        <div class="notice-box warn"><i class="bi bi-exclamation-triangle"></i> O pagamento online ainda não foi ativado pela organização. Fale com a PLAY4LAN para pagar no balcão: a vaga é confirmada por eles.</div>
+      {% elif slots_left <= 0 %}
+        <div class="notice-box warn"><i class="bi bi-exclamation-triangle"></i> As vagas estão todas reservadas no momento. Tente de novo em alguns minutos: Pix não pagos liberam a vaga em 30 minutos.</div>
+      {% else %}
+        {% if payment and not payment.is_open %}<div class="notice-box"><i class="bi bi-clock-history"></i> O Pix anterior expirou sem pagamento. Gere um novo.</div>{% endif %}
+        <form method="post" action="/tournaments/{{ t.id }}/inscricao/{{ team.id }}/pix" class="form">
+          <label class="field"><span>E-mail para o comprovante *</span><input name="email" type="email" required value="{{ payment.payer_email if payment else '' }}" placeholder="seu@email.com"></label>
+          <p class="muted small"><i class="bi bi-shield-lock"></i> Pagamento processado pelo Mercado Pago. O Pix vale por 30 minutos e reserva a vaga do seu time enquanto isso.</p>
+          <button class="btn btn-primary btn-lg btn-block" type="submit"><i class="bi bi-qr-code"></i> Gerar Pix de {{ money(t.entry_fee_cents) }}</button>
+        </form>
+      {% endif %}
+      {% if is_captain %}
+      <form method="post" action="/tournaments/{{ t.id }}/unregister/{{ team.id }}" data-confirm="Desistir da inscrição do {{ team.name }}?" class="cancel-form"><button class="link-btn" type="submit">Desistir da inscrição</button></form>
+      {% endif %}
+    {% endif %}
+  </section>
+
+  <aside class="panel checkout-side">
+    <div class="reg-team">{{ team_logo(team, 'md') }}<div><b>{{ team.name }}</b><small>{{ team.tag }} · {{ team.members|length }}/{{ roster_size }}</small></div></div>
+    <div class="side-status">{{ badge(reg.status) }}</div>
+    <ul class="mini-roster">
+      {% for m in team.roster %}<li>{{ avatar(m.user, 'xs') }}<span>{{ m.user.display_name }}</span>{% if m.user_id == team.owner_id %}<i class="bi bi-star-fill" title="Capitão"></i>{% endif %}</li>{% endfor %}
+    </ul>
+    <dl class="summary">
+      <div><dt>Campeonato</dt><dd>{{ t.name }}</dd></div>
+      {% if t.starts_at %}<div><dt>Data</dt><dd>{{ t.starts_at.strftime('%d/%m/%Y %H:%M') }}</dd></div>{% endif %}
+      <div><dt>Inscrição</dt><dd>{{ money(t.entry_fee_cents) }}</dd></div>
+    </dl>
+  </aside>
+</div>
+{% endblock %}

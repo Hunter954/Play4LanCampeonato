@@ -12,7 +12,12 @@
       <span><i class="bi bi-people-fill"></i> {{ team.members|length }}/{{ roster_size }} jogadores</span>
       <span><i class="bi bi-star-fill"></i> Capitão: <a href="/jogadores/{{ team.owner_id }}">{{ team.owner.display_name }}</a></span>
       {% if team.is_full %}<span class="ok"><i class="bi bi-check-circle-fill"></i> Elenco completo</span>{% endif %}
+      {% set lock = team.locking_registration %}
+      {% if lock %}<span class="lock"><i class="bi bi-lock-fill"></i> Elenco travado · <a href="/tournaments/{{ lock.tournament_id }}">{{ lock.tournament.name }}</a></span>{% endif %}
     </div>
+    {% if can_manage and team.is_full and not lock %}
+    <a class="btn btn-primary btn-sm team-cta" href="/tournaments/"><i class="bi bi-trophy"></i> Elenco completo! Inscrever num campeonato</a>
+    {% endif %}
   </div>
   <div class="team-banner-actions">
     {% if can_manage %}<a class="btn btn-ghost" href="/teams/{{ team.id }}/edit"><i class="bi bi-gear"></i> Editar time</a>{% endif %}

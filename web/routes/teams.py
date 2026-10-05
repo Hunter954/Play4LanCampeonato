@@ -2,7 +2,7 @@ import re, secrets
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 from flask_login import login_required, current_user
 from web.extensions import db
-from web.models import Team, TeamMember, Invite, TournamentRegistration, Match, ROSTER_SIZE
+from web.models import Team, TeamMember, Invite, TournamentRegistration, Match, Payment, ROSTER_SIZE, ACTIVE_REG_STATUSES
 from web.routes.auth import onboarded_required
 bp=Blueprint('teams',__name__,url_prefix='/teams')
 
@@ -10,8 +10,13 @@ TAG_RE=re.compile(r'^[A-Za-z0-9]{2,5}$')
 
 def owner(team): return current_user.is_authenticated and (current_user.is_admin or team.owner_id==current_user.id)
 
+def _roster_locked(team):
+    reg=team.locking_registration
+    if reg: flash(f'O elenco está travado pela inscrição no {reg.tournament.name}. Fale com a organização para trocar jogadores.','danger')
+    return bool(reg)
+
 def _active_registrations(team):
-    return TournamentRegistration.query.filter(TournamentRegistration.team_id==team.id, TournamentRegistration.status!='REJECTED').count()
+    return TournamentRegistration.query.filter(TournamentRegistration.team_id==team.id, TournamentRegistration.status.in_(ACTIVE_REG_STATUSES)).count()
 
 def _validate_team_form(f, team=None):
     name=(f.get('name') or '').strip()[:40]; tag=(f.get('tag') or '').strip().upper(); logo=(f.get('logo_url') or '').strip()[:500]
@@ -104,6 +109,7 @@ def leave(team_id):
     if t.owner_id==current_user.id:
         flash('O capitão não pode sair. Passe a capitania para outro jogador ou exclua o time.','danger'); return redirect(url_for('teams.detail',team_id=t.id))
     m=TeamMember.query.filter_by(team_id=t.id,user_id=current_user.id).first_or_404()
+    if _roster_locked(t): return redirect(url_for('teams.detail',team_id=t.id))
     db.session.delete(m); db.session.commit(); flash(f'Você saiu do {t.name}.','info'); return redirect(url_for('main.account'))
 
 @bp.post('/<int:team_id>/remove/<int:user_id>')
@@ -112,6 +118,7 @@ def remove_member(team_id,user_id):
     t=Team.query.get_or_404(team_id)
     if not owner(t) or user_id==t.owner_id: abort(403)
     m=TeamMember.query.filter_by(team_id=team_id,user_id=user_id).first_or_404()
+    if not current_user.is_admin and _roster_locked(t): return redirect(url_for('teams.detail',team_id=t.id))
     name=m.user.display_name; db.session.delete(m); db.session.commit()
     flash(f'{name} foi removido do time.','info'); return redirect(url_for('teams.detail',team_id=team_id))
 
@@ -134,6 +141,8 @@ def delete(team_id):
     if _active_registrations(t) or Match.query.filter(db.or_(Match.team1_id==t.id,Match.team2_id==t.id)).first():
         flash('Esse time tem inscrição ou partida em campeonato e não pode ser excluído. Fale com a organização.','danger')
         return redirect(url_for('teams.detail',team_id=t.id))
+    reg_ids=[r.id for r in TournamentRegistration.query.filter_by(team_id=t.id).all()]
+    if reg_ids: Payment.query.filter(Payment.registration_id.in_(reg_ids)).delete(synchronize_session=False)
     TournamentRegistration.query.filter_by(team_id=t.id).delete(); Invite.query.filter_by(team_id=t.id).delete()
     name=t.name; db.session.delete(t); db.session.commit()
     flash(f'O time {name} foi excluído.','info'); return redirect(url_for('main.account'))

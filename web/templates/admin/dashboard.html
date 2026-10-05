@@ -78,23 +78,35 @@
     </div>
   </section>
 
+  <section id="tournaments" class="admin-section">
+    <div class="section-heading">
+      <div><span class="section-kicker">COMPETIÇÕES</span><h2>Campeonatos</h2></div>
+      <a class="button secondary" href="/admin/tournaments/"><i class="bi bi-list-ul"></i> Todos</a>
+    </div>
+    <div class="list-panel">
+      {% for t in tournaments %}
+      <a class="admin-list-row" href="/admin/tournaments/{{ t.id }}">
+        <div class="list-avatar"><i class="bi bi-trophy-fill"></i></div>
+        <div class="list-main"><b>{{ t.name }}</b><span>{{ t.approved_count }}/{{ t.max_teams }} confirmados · {{ 'R$ %.2f'|format(t.entry_fee) if t.entry_fee_cents else 'Gratuito' }}</span></div>
+        <span class="soft-badge {{ t.status|lower }}">{{ t.status|label }}</span>
+        <i class="bi bi-chevron-right muted"></i>
+      </a>
+      {% else %}<div class="empty-inline"><i class="bi bi-trophy"></i> Nenhum campeonato. <a href="/admin/tournaments/create">Criar o primeiro</a></div>{% endfor %}
+    </div>
+  </section>
+
   <div class="admin-two-column">
     <section id="registrations" class="admin-section compact-section">
-      <div class="section-heading"><div><span class="section-kicker">EQUIPES</span><h2>Inscrições</h2></div></div>
+      <div class="section-heading"><div><span class="section-kicker">EQUIPES</span><h2>Inscrições para revisar</h2></div></div>
       <div class="list-panel">
         {% for r in regs %}
-        <div class="admin-list-row" data-registration-id="{{ r.id }}">
+        <a class="admin-list-row" href="/admin/tournaments/{{ r.tournament_id }}" data-registration-id="{{ r.id }}">
           <div class="list-avatar"><i class="bi bi-people-fill"></i></div>
-          <div class="list-main"><b>{{ r.team.name }}</b><span>{{ r.tournament.name }}</span></div>
-          <span class="soft-badge {{ r.status|lower }}">{{ r.status }}</span>
-          {% if r.status == 'PENDING' %}
-          <div class="row-actions">
-            <form class="js-async-form" method="post" action="/admin/registration/{{r.id}}/APPROVED"><button class="icon-button good" title="Aprovar"><i class="bi bi-check-lg"></i></button></form>
-            <form class="js-async-form" method="post" action="/admin/registration/{{r.id}}/REJECTED"><button class="icon-button danger" title="Recusar"><i class="bi bi-x-lg"></i></button></form>
-          </div>
-          {% endif %}
-        </div>
-        {% else %}<div class="empty-inline"><i class="bi bi-inbox"></i> Nenhuma inscrição registrada.</div>{% endfor %}
+          <div class="list-main"><b>{{ r.team.name }}</b><span>{{ r.tournament.name }}{% if r.admin_note %} · {{ r.admin_note }}{% endif %}</span></div>
+          <span class="soft-badge pending">{{ r.status|label }}</span>
+          <i class="bi bi-chevron-right muted"></i>
+        </a>
+        {% else %}<div class="empty-inline"><i class="bi bi-inbox"></i> Nada para revisar. Pagamentos pelo Mercado Pago confirmam sozinhos.</div>{% endfor %}
       </div>
     </section>
 

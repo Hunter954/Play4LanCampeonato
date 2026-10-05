@@ -27,6 +27,13 @@
 </section>
 
 <div class="wrap page">
+  {% if live %}
+  <section class="section">
+    <div class="section-head"><div><span class="kicker"><span class="live-dot-sm"></span> Agora</span><h2>Ao vivo</h2></div></div>
+    <div class="panel flush">{% for m in live %}{{ match_row(m) }}{% endfor %}</div>
+  </section>
+  {% endif %}
+
   <section class="section">
     <div class="section-head"><div><span class="kicker">Inscrições</span><h2>Campeonatos</h2></div><a class="link-more" href="/tournaments/">Ver todos <i class="bi bi-arrow-right"></i></a></div>
     <div class="t-grid">
@@ -36,12 +43,13 @@
   </section>
 
   <section class="section">
-    <div class="section-head"><div><span class="kicker">Como funciona</span><h2>Do login à partida em 4 passos</h2></div></div>
+    <div class="section-head"><div><span class="kicker">Como funciona</span><h2>Do login à partida em 5 passos</h2></div></div>
     <ol class="how">
       <li><i class="bi bi-steam"></i><b>Entre com a Steam</b><span>Sem senha nova: usamos sua conta Steam para identificar você no servidor.</span></li>
       <li><i class="bi bi-person-vcard"></i><b>Complete o cadastro</b><span>Nick, nome e WhatsApp para a organização falar com você no dia.</span></li>
+      <li><i class="bi bi-diagram-3"></i><b>Chave e veto</b><span>Dupla eliminação: perdeu na upper, ainda tem a lower. Veto de mapas pelo celular.</span></li>
       <li><i class="bi bi-people-fill"></i><b>Monte o time</b><span>Crie o time e mande o link de convite para os outros 4 jogadores.</span></li>
-      <li><i class="bi bi-trophy-fill"></i><b>Inscreva-se</b><span>O capitão inscreve o time e a organização confirma a vaga.</span></li>
+      <li><i class="bi bi-qr-code"></i><b>Pague e jogue</b><span>Com 5 jogadores, o capitão paga via Pix e a vaga é confirmada na hora.</span></li>
     </ol>
   </section>
 

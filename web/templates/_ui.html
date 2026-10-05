@@ -12,23 +12,41 @@
 <span class="badge badge-{{ (status or '')|lower }}">{{ status|label }}</span>
 {%- endmacro %}
 
+{% macro money(cents) -%}{% if cents %}R$ {{ '%.2f'|format(cents / 100)|replace('.', ',') }}{% else %}Gratuito{% endif %}{%- endmacro %}
+
 {% macro match_row(m) -%}
-<div class="match-row">
-  <div class="match-team">{% if m.team1 %}{{ team_logo(m.team1, 'xs') }}<a href="/teams/{{ m.team1.id }}">{{ m.team1.name }}</a>{% else %}<span class="muted">A definir</span>{% endif %}</div>
-  <div class="match-score"><b class="{{ 'win' if m.team1_score > m.team2_score }}">{{ m.team1_score }}</b><span>:</span><b class="{{ 'win' if m.team2_score > m.team1_score }}">{{ m.team2_score }}</b></div>
-  <div class="match-team right">{% if m.team2 %}<a href="/teams/{{ m.team2.id }}">{{ m.team2.name }}</a>{{ team_logo(m.team2, 'xs') }}{% else %}<span class="muted">A definir</span>{% endif %}</div>
-  <div class="match-meta">{{ badge(m.status) }}<span><i class="bi bi-map"></i> {{ m.current_map or 'Mapa a definir' }}</span></div>
-</div>
+<a class="match-row" href="/partidas/{{ m.id }}">
+  <div class="match-team {{ 'lost' if m.winner_id and m.winner_id != m.team1_id }}">{% if m.team1 %}{{ team_logo(m.team1, 'xs') }}<span>{{ m.team1.name }}</span>{% else %}<span class="muted">A definir</span>{% endif %}</div>
+  <div class="match-score">{% if m.status in ['LIVE', 'FINISHED'] %}<b class="{{ 'win' if m.team1_score > m.team2_score }}">{{ m.team1_score }}</b><span>:</span><b class="{{ 'win' if m.team2_score > m.team1_score }}">{{ m.team2_score }}</b>{% else %}<span class="vs-text">VS</span>{% endif %}</div>
+  <div class="match-team right {{ 'lost' if m.winner_id and m.winner_id != m.team2_id }}">{% if m.team2 %}<span>{{ m.team2.name }}</span>{{ team_logo(m.team2, 'xs') }}{% else %}<span class="muted">A definir</span>{% endif %}</div>
+  <div class="match-meta">{{ badge(m.status) }}<span>{% if m.label %}{{ m.label }}{% else %}<i class="bi bi-map"></i> {{ m.current_map or 'Mapa a definir' }}{% endif %}</span></div>
+</a>
 {%- endmacro %}
 
 {% macro tournament_card(t) -%}
 {% set filled = t.approved_count %}
 <a class="t-card" href="/tournaments/{{ t.id }}">
-  <div class="t-card-art"><i class="bi bi-trophy-fill"></i>{{ badge(t.status) }}</div>
+  <div class="t-card-art"><i class="bi bi-trophy-fill"></i>{{ badge(t.status) }}{% if t.starts_at %}<span class="t-date"><b>{{ t.starts_at.strftime('%d') }}</b>{{ ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'][t.starts_at.month - 1] }}</span>{% endif %}</div>
   <div class="t-card-body">
     <h3>{{ t.name }}</h3>
-    <p class="t-meta"><span><i class="bi bi-diagram-3"></i> {{ t.format|label }}</span><span><i class="bi bi-geo-alt"></i> Presencial</span></p>
+    <p class="t-meta"><span><i class="bi bi-diagram-3"></i> {{ t.format|label }}</span><span><i class="bi bi-ticket-perforated"></i> {{ money(t.entry_fee_cents) }}</span>{% if t.location %}<span><i class="bi bi-geo-alt"></i> {{ t.location }}</span>{% endif %}</p>
     <div class="slots"><div class="slots-bar"><span style="width: {{ [100, (filled * 100 / (t.max_teams or 1))|round]|min }}%"></span></div><small><b>{{ filled }}</b>/{{ t.max_teams }} times confirmados</small></div>
   </div>
+</a>
+{%- endmacro %}
+
+{% macro bracket_team(m, slot, by_id, describe) -%}
+{% set team = m.team1 if slot == 1 else m.team2 %}{% set src = m.team1_from if slot == 1 else m.team2_from %}
+{% set score = m.team1_score if slot == 1 else m.team2_score %}
+<div class="bt {{ 'win' if m.winner_id and team and m.winner_id == team.id }} {{ 'lose' if m.winner_id and team and m.winner_id != team.id }} {{ 'bt-empty' if not team }}" {% if team %}data-team="{{ team.id }}"{% endif %}>
+  {% if team %}{{ team_logo(team, 'xs') }}<span class="bt-name">{{ team.name }}</span>{% else %}<span class="bt-name muted">{{ describe(src, by_id) }}</span>{% endif %}
+  <b class="bt-score">{% if m.status in ['LIVE', 'FINISHED'] and team and not m.walkover %}{{ score }}{% elif m.walkover and m.winner_id and team and m.winner_id == team.id %}W{% endif %}</b>
+</div>
+{%- endmacro %}
+
+{% macro bracket_match(m, by_id, describe, code, href) -%}
+<a class="bm bm-{{ m.status|lower }}" href="{{ href }}">
+  <span class="bm-code">{{ code(m) }}{% if m.best_of and m.best_of > 1 %} · MD{{ m.best_of }}{% endif %}{% if m.status == 'LIVE' %}<i class="live-dot-sm"></i>{% endif %}</span>
+  {{ bracket_team(m, 1, by_id, describe) }}{{ bracket_team(m, 2, by_id, describe) }}
 </a>
 {%- endmacro %}

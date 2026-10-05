@@ -1,5 +1,5 @@
 {% extends 'site_base.html' %}
-{% from '_ui.html' import avatar, team_logo, badge, tournament_card %}
+{% from '_ui.html' import avatar, team_logo, badge, tournament_card, match_row %}
 {% block title %}Minha conta · PLAY4LAN{% endblock %}
 {% block content %}
 <section class="profile-head">
@@ -48,11 +48,18 @@
     {% if regs %}
     <h3 class="sub">Inscrições</h3>
     {% for r in regs %}
-    <a class="list-row" href="/tournaments/{{ r.tournament_id }}"><span class="icon-box"><i class="bi bi-trophy"></i></span><div><b>{{ r.tournament.name }}</b><small>{{ r.team.name }}</small></div>{{ badge(r.status) }}</a>
+    <a class="list-row" href="/tournaments/{{ r.tournament_id }}/inscricao/{{ r.team_id }}"><span class="icon-box"><i class="bi bi-trophy"></i></span><div><b>{{ r.tournament.name }}</b><small>{{ r.team.name }}</small></div>{{ badge(r.status) }}</a>
     {% endfor %}
     {% endif %}
   </section>
 </div>
+
+{% if upcoming %}
+<section class="section">
+  <div class="section-head"><div><span class="kicker">Seu time</span><h2>Próximas partidas</h2></div></div>
+  <div class="panel flush">{% for m in upcoming %}{{ match_row(m) }}{% endfor %}</div>
+</section>
+{% endif %}
 
 {% if open_tournaments %}
 <section class="section">

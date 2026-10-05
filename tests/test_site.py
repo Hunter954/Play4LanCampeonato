@@ -99,7 +99,7 @@ def test_team_flow_invite_full_roster_and_registration(app):
     t=Tournament(name='Copa LAN',max_teams=8); db.session.add(t); db.session.commit()
     assert c.get(f'/tournaments/{t.id}').status_code==200
     r=c.post(f'/tournaments/{t.id}/register/{team.id}')
-    assert TournamentRegistration.query.filter_by(tournament_id=t.id,team_id=team.id).one().status=='PENDING'
+    assert TournamentRegistration.query.filter_by(tournament_id=t.id,team_id=team.id).one().status=='APPROVED'  # campeonato gratuito
 
     # jogador do time inscrito não pode ser inscrito por outro time
     p2=User.query.filter_by(nickname='player2').one(); cap2=make_user(7)

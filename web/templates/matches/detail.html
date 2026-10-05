@@ -1,0 +1,54 @@
+{% extends 'site_base.html' %}
+{% from '_ui.html' import avatar, team_logo, badge %}
+{% block title %}{{ (m.team1.tag if m.team1 else '?') ~ ' vs ' ~ (m.team2.tag if m.team2 else '?') }} · PLAY4LAN{% endblock %}
+{% block content %}
+{% if m.tournament %}<a class="back" href="/tournaments/{{ m.tournament_id }}/chave"><i class="bi bi-arrow-left"></i> {{ m.tournament.name }} · Chaveamento</a>{% endif %}
+<div data-match data-state-url="/partidas/{{ m.id }}/estado" data-board-url="/partidas/{{ m.id }}/placar" data-veto-url="/partidas/{{ m.id }}/veto">
+<script type="application/json" data-initial-state>{{ state|tojson }}</script>
+<section class="match-hero">
+  <div class="mh-meta"><span class="mh-code">{{ code }}</span><span>{{ m.label or 'Partida' }}</span><span>MD{{ m.best_of or 1 }}</span><span data-status-badge>{{ badge(m.status) }}</span>{% if m.server_id and m.status in ['LOADED','LIVE'] %}<span><i class="bi bi-hdd-network"></i> {{ m.server_id }}</span>{% endif %}</div>
+  <div class="mh-teams">
+    {% for slot in [1, 2] %}{% set team = m.team1 if slot == 1 else m.team2 %}{% set src = m.team1_from if slot == 1 else m.team2_from %}
+    <div class="mh-team {{ 'right' if slot == 2 }} {{ 'winner' if m.winner_id and team and m.winner_id == team.id }} {{ 'loser' if m.winner_id and team and m.winner_id != team.id }}">
+      {% if team %}<a href="/teams/{{ team.id }}">{{ team_logo(team, 'xl') }}</a><a class="mh-name" href="/teams/{{ team.id }}">{{ team.name }}</a><small>{{ team.tag }}</small>
+      {% else %}<span class="team-logo team-logo-xl team-logo-empty">?</span><span class="mh-name muted">{{ describe(src, by_id) }}</span>{% endif %}
+    </div>
+    {% if slot == 1 %}
+    <div class="mh-score">
+      <div class="mh-digits"><b data-score="1" class="{{ 'win' if m.winner_id and m.winner_id == m.team1_id }}">{{ m.team1_score or 0 }}</b><span>:</span><b data-score="2" class="{{ 'win' if m.winner_id and m.winner_id == m.team2_id }}">{{ m.team2_score or 0 }}</b></div>
+      <small data-current-map>{% if m.status == 'FINISHED' and m.walkover %}W.O.{% elif m.current_map %}{{ m.current_map }}{% else %}Mapa a definir{% endif %}</small>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% if maps|length > 1 %}
+  <div class="mh-maps">{% for mm in maps %}<div class="mh-map {{ mm.status|lower }}"><span>Mapa {{ mm.map_number }} · {{ mm.picked_by.tag if mm.picked_by else 'Decisivo' }}</span><b>{{ mm.map_name }}</b><em>{% if mm.status != 'PENDING' %}{{ mm.team1_score }} : {{ mm.team2_score }}{% else %}—{% endif %}</em></div>{% endfor %}</div>
+  {% endif %}
+</section>
+
+<section class="section tight veto-section" data-veto-section {% if m.status in ['WAITING','READY'] and not maps %}hidden{% endif %}>
+  <div class="section-head"><h2>Veto de mapas</h2><span class="veto-turn" data-veto-turn></span></div>
+  <div class="veto-grid" data-veto-grid></div>
+  <p class="muted small veto-help" data-veto-help></p>
+</section>
+
+{% if m.status in ['WAITING','READY'] and not maps %}
+<div class="notice-box"><i class="bi bi-clock"></i> {% if m.status == 'WAITING' %}Aguardando os dois times desta partida.{% else %}Times definidos. O veto abre quando a organização chamar a partida.{% endif %}</div>
+{% endif %}
+
+<div data-scoreboard>{% include 'matches/_scoreboard.html' %}</div>
+
+{% if not board and m.team1 and m.team2 %}
+<section class="section tight">
+  <div class="section-head"><h2>Elencos</h2></div>
+  <div class="two-col">
+    {% for team in [m.team1, m.team2] %}
+    <div class="panel"><div class="reg-team">{{ team_logo(team, 'sm') }}<div><b>{{ team.name }}</b><small>{{ team.tag }}</small></div></div>
+      <ul class="mini-roster">{% for mb in team.roster %}<li>{{ avatar(mb.user, 'xs') }}<a href="/jogadores/{{ mb.user_id }}">{{ mb.user.display_name }}</a>{% if mb.user_id == team.owner_id %}<i class="bi bi-star-fill" title="Capitão"></i>{% endif %}</li>{% endfor %}</ul>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+</div>
+{% endblock %}

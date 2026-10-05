@@ -1,0 +1,19 @@
+<section class="admin-hero t-admin-hero">
+  <div>
+    <a class="back-link" href="/admin/tournaments/"><i class="bi bi-arrow-left"></i> Campeonatos</a>
+    <h1>{{ t.name }}</h1>
+    <p>{{ t.approved_count }}/{{ t.max_teams }} confirmados · {{ 'R$ %.2f'|format(t.entry_fee)|replace('.', ',') if t.entry_fee_cents else 'Gratuito' }}{% if t.starts_at %} · {{ t.starts_at.strftime('%d/%m %H:%M') }}{% endif %}</p>
+  </div>
+  <div class="hero-actions">
+    <span class="soft-badge {{ t.status|lower }}">{{ t.status|label }}</span>
+    {% for st, label, icon in [('REGISTRATION','Abrir inscrições','bi-unlock'),('CLOSED','Fechar inscrições','bi-lock'),('RUNNING','Em andamento','bi-play-fill'),('FINISHED','Finalizar','bi-flag-fill')] %}
+      {% if t.status != st %}<form class="js-async-form" method="post" action="/admin/tournaments/{{ t.id }}/status/{{ st }}"><button class="button ghost small"><i class="bi {{ icon }}"></i> {{ label }}</button></form>{% endif %}
+    {% endfor %}
+    <a class="button secondary" href="/tournaments/{{ t.id }}" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Página pública</a>
+  </div>
+</section>
+<nav class="server-tabs">
+  <a href="/admin/tournaments/{{ t.id }}" class="{{ 'active' if tab == 'registrations' }}"><i class="bi bi-people"></i> Inscrições</a>
+  <a href="/admin/tournaments/{{ t.id }}/chave" class="{{ 'active' if tab == 'bracket' }}"><i class="bi bi-diagram-3"></i> Chave e partidas</a>
+  <a href="/admin/tournaments/{{ t.id }}/edit" class="{{ 'active' if tab == 'settings' }}"><i class="bi bi-gear"></i> Configurações</a>
+</nav>

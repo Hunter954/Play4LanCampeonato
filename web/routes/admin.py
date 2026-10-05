@@ -83,6 +83,13 @@ def _queued(server,row):
     return redirect(url_for('admin.server_detail',code=server.code))
 
 
+REVIEW_STATUSES = ('PENDING', 'PAYMENT_REVIEW')
+
+
+def _pending_registrations():
+    return TournamentRegistration.query.filter(TournamentRegistration.status.in_(REVIEW_STATUSES)).count()
+
+
 def _server_page(code, template, **extra):
     server=Server.query.filter_by(code=code).first_or_404(); telemetry=_latest_telemetry(code)
     return render_template(template, server=server, telemetry=telemetry, maps=MAPS, **extra)
@@ -93,7 +100,8 @@ def _server_page(code, template, **extra):
 def dashboard():
     servers=Server.query.order_by(Server.code).all(); states={s.code:_latest_telemetry(s.code) for s in servers}
     return render_template('admin/dashboard.html',servers=servers,server_states=states,
-        pending_count=TournamentRegistration.query.filter_by(status='PENDING').count(),
+        pending_count=_pending_registrations(),tournaments=Tournament.query.order_by(Tournament.id.desc()).limit(5).all(),
+        regs=TournamentRegistration.query.filter(TournamentRegistration.status.in_(REVIEW_STATUSES)).order_by(TournamentRegistration.id.desc()).limit(8).all(),
         online_count=sum(1 for s in servers if (s.status or '').upper()=='ONLINE'),
         players_total=sum(int((states.get(s.code) or {}).get('player_count') or 0) for s in servers),
         matches=Match.query.order_by(Match.id.desc()).limit(6).all())
@@ -104,7 +112,7 @@ def admin_overview_api():
     servers=Server.query.order_by(Server.code).all(); snaps=[_server_snapshot(s) for s in servers]
     return jsonify(ok=True,servers=snaps,summary={'servers_online':sum(1 for s in snaps if s['status'].upper()=='ONLINE'),
         'servers_total':len(snaps),'players_total':sum(int((s['telemetry'] or {}).get('player_count') or 0) for s in snaps),
-        'pending_registrations':TournamentRegistration.query.filter_by(status='PENDING').count()})
+        'pending_registrations':_pending_registrations()})
 
 @bp.get('/api/servers/<code>/state')
 @admin_only
@@ -216,14 +224,6 @@ def server_rcon(code):
     command=(request.form.get('command') or '').strip()
     if not command or len(command)>500:abort(400)
     server=Server.query.filter_by(code=code).first_or_404(); return _queued(server,queue_command(server,'RCON',{'command':command}))
-
-@bp.route('/tournaments/create',methods=['GET','POST'])
-@admin_only
-def create_tournament():
-    if request.method=='POST':
-        t=Tournament(name=request.form['name'],description=request.form.get('description'),max_teams=int(request.form.get('max_teams',16)))
-        db.session.add(t);db.session.commit();return redirect(url_for('tournaments.detail',tid=t.id))
-    return render_template('admin/create_tournament.html')
 
 @bp.post('/registration/<int:rid>/<status>')
 @admin_only

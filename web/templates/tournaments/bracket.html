@@ -1,0 +1,33 @@
+{% extends 'site_base.html' %}
+{% from '_ui.html' import bracket_match %}
+{% block title %}Chaveamento · {{ t.name }} · PLAY4LAN{% endblock %}
+{% block content %}
+{% include 'tournaments/_header.html' %}
+{% if not final %}
+<div class="empty"><i class="bi bi-diagram-3"></i><b>A chave ainda não foi sorteada</b><span>Ela é gerada quando as inscrições fecham. São {{ t.max_teams }} vagas em dupla eliminação: quem perde na upper ainda tem a lower.</span></div>
+{% else %}
+<p class="muted small bracket-help"><i class="bi bi-hand-index"></i> Passe o mouse num time para ver o caminho dele. Toque numa partida para ver veto, placar e estatísticas.</p>
+<section class="bracket-block">
+  <h2><span class="bracket-tag up">UPPER</span> Chave superior</h2>
+  <div class="bracket" data-bracket>
+    {% for col in upper %}
+    <div class="b-col"><div class="b-col-title">{{ col[0].label }}</div><div class="b-col-body">
+      {% for m in col %}{{ bracket_match(m, by_id, describe, code, '/partidas/' ~ m.id) }}{% endfor %}
+    </div></div>
+    {% endfor %}
+    <div class="b-col final-col"><div class="b-col-title">Grande final</div><div class="b-col-body">{{ bracket_match(final, by_id, describe, code, '/partidas/' ~ final.id) }}</div></div>
+  </div>
+</section>
+<section class="bracket-block">
+  <h2><span class="bracket-tag low">LOWER</span> Chave inferior</h2>
+  <p class="muted small">Quem perde na upper cai aqui, sempre do lado oposto ao do adversário que te eliminou, para não repetir o confronto. Perdeu na lower, está fora.</p>
+  <div class="bracket" data-bracket>
+    {% for col in lower %}
+    <div class="b-col"><div class="b-col-title">{{ col[0].label }}</div><div class="b-col-body">
+      {% for m in col %}{{ bracket_match(m, by_id, describe, code, '/partidas/' ~ m.id) }}{% endfor %}
+    </div></div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

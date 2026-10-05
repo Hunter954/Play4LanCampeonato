@@ -1,0 +1,27 @@
+{% from '_ui.html' import badge, money, team_logo %}
+{% set filled = confirmed|length %}
+<section class="t-banner">
+  <div class="t-banner-top">
+    <div class="t-banner-main">
+      <div class="t-badges">{{ badge(t.status) }}{% if live %}<span class="badge badge-live">{{ live|length }} ao vivo</span>{% endif %}</div>
+      <h1>{{ t.name }}</h1>
+      <p class="t-sub">{% if t.starts_at %}<span><i class="bi bi-calendar-event"></i> {{ t.starts_at.strftime('%d/%m/%Y às %H:%M') }}</span>{% endif %}{% if t.location %}<span><i class="bi bi-geo-alt"></i> {{ t.location }}</span>{% endif %}<span><i class="bi bi-ticket-perforated"></i> {{ money(t.entry_fee_cents) }} por time</span></p>
+    </div>
+    {% if t.champion %}
+    <div class="champion"><i class="bi bi-trophy-fill"></i><div><small>Campeão</small><a href="/teams/{{ t.champion.id }}">{{ team_logo(t.champion, 'sm') }} {{ t.champion.name }}</a></div></div>
+    {% endif %}
+  </div>
+  <div class="t-facts">
+    <div><i class="bi bi-diagram-3"></i><span>Formato</span><b>{{ t.format|label }}</b></div>
+    <div><i class="bi bi-people"></i><span>Vagas</span><b>{{ filled }}/{{ t.max_teams }}{% if t.is_open %} · {{ slots_left }} livre{{ 's' if slots_left != 1 }}{% endif %}</b></div>
+    <div><i class="bi bi-collection-play"></i><span>Séries</span><b>MD{{ t.bo_default or 1 }} · Final MD{{ t.bo_grand_final or 3 }}</b></div>
+    <div><i class="bi bi-gift"></i><span>Premiação</span><b>{{ (t.prize.split('\n')[0] if t.prize else 'A divulgar')|truncate(40) }}</b></div>
+  </div>
+  <div class="slots"><div class="slots-bar big"><span style="width: {{ [100, (filled * 100 / (t.max_teams or 1))|round]|min }}%"></span></div><small><b>{{ filled }}</b> de {{ t.max_teams }} times confirmados</small></div>
+</section>
+<nav class="tabs">
+  <a href="/tournaments/{{ t.id }}" class="{{ 'active' if tab == 'overview' }}"><i class="bi bi-info-circle"></i> Visão geral</a>
+  <a href="/tournaments/{{ t.id }}/chave" class="{{ 'active' if tab == 'bracket' }}"><i class="bi bi-diagram-3"></i> Chaveamento</a>
+  <a href="/tournaments/{{ t.id }}/partidas" class="{{ 'active' if tab == 'matches' }}"><i class="bi bi-controller"></i> Partidas</a>
+  <a href="/tournaments/{{ t.id }}/estatisticas" class="{{ 'active' if tab == 'stats' }}"><i class="bi bi-bar-chart-line"></i> Estatísticas</a>
+</nav>
