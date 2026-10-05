@@ -1,0 +1,12 @@
+.env
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.sqlite
+*.db
+agent/config.json
+.DS_Store
+runtime/
+backup/
+steamcmd/
