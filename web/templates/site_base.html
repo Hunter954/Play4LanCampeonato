@@ -37,7 +37,7 @@
             </div>
           </div>
         {% else %}
-          <a class="btn btn-steam" href="/auth/steam{{ '?next=' ~ (request.full_path.rstrip('?')|urlencode) if path not in ['/', '/auth/entrar'] }}"><i class="bi bi-steam"></i> Entrar com Steam</a>
+          <a class="btn btn-steam" href="/auth/steam{{ ('?next=' ~ (request.args.get('next')|urlencode)) if path.startswith('/auth') and request.args.get('next') else ('?next=' ~ (request.full_path.rstrip('?')|urlencode)) if path != '/' and not path.startswith('/auth') }}"><i class="bi bi-steam"></i> Entrar com Steam</a>
         {% endif %}
         </div>
       </nav>

@@ -43,6 +43,8 @@ def entrar():
 @bp.route('/login',methods=['GET','POST'])
 def login():
     nxt=safe_next(request.args.get('next'))
+    if request.method=='GET' and current_user.is_authenticated and current_user.is_admin:
+        return redirect(nxt or url_for('admin.dashboard'))
     if request.method=='POST':
         u=User.query.filter_by(email=(request.form.get('email') or '').strip().lower()).first() or User.query.filter_by(email=request.form.get('email')).first()
         if u and u.password_hash and check_password_hash(u.password_hash,request.form.get('password','')):
