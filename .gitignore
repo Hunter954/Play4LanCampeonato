@@ -10,3 +10,4 @@ agent/config.json
 runtime/
 backup/
 steamcmd/
+*.log
